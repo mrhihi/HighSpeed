@@ -1,11 +1,10 @@
 import { Router } from "express";
-import { getOrFetchCached, type CacheLookup } from "../cache";
+import { getOrFetchCached } from "../cache";
+import { fetchDailySeatData } from "../dailySeatData";
 import { tdxGet } from "../tdxClient";
 import type {
   AvailableSeat,
-  AvailableSeatStatusWrapper,
   PlannerSearchRequestBody,
-  RailODDailyTimetable,
   RailStation,
   SeatMode,
   SeatPlan,
@@ -18,8 +17,6 @@ function cacheTtlEnv(name: string, fallback: number): number {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
-const SEAT_CACHE_TTL_MS = cacheTtlEnv("TDX_SEAT_CACHE_TTL_MS", 60 * 1000);
-const TIMETABLE_CACHE_TTL_MS = cacheTtlEnv("TDX_TIMETABLE_CACHE_TTL_MS", 24 * 60 * 60 * 1000);
 const FREE_SEATING_CACHE_TTL_MS = cacheTtlEnv("TDX_FREE_SEATING_CACHE_TTL_MS", 24 * 60 * 60 * 1000);
 const STATION_CACHE_TTL_MS = Number.POSITIVE_INFINITY;
 const DEFAULT_TRANSFER_MINUTES = 15;
@@ -34,54 +31,6 @@ interface FreeSeatingCar {
 
 interface FreeSeatingWrapper {
   FreeSeatingCars?: FreeSeatingCar[];
-}
-
-interface SegmentData extends CacheLookup<AvailableSeatStatusWrapper> {
-  seats: AvailableSeat[];
-}
-
-function stationName(station: RailStation | undefined, fallback: string) {
-  return station?.StationName ?? { Zh_tw: fallback };
-}
-
-async function fetchSegment(origin: string, destination: string, date: string, forceRefresh: boolean): Promise<SegmentData> {
-  const key = `${origin}:${destination}:${date}`;
-  const seatData = await getOrFetchCached(
-    "seats",
-    key,
-    SEAT_CACHE_TTL_MS,
-    () => tdxGet<AvailableSeatStatusWrapper>(
-      `/v2/Rail/THSR/AvailableSeatStatus/Train/OD/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}/TrainDate/${encodeURIComponent(date)}`,
-    ),
-    forceRefresh,
-  );
-
-  let timetable: RailODDailyTimetable[] = [];
-  try {
-    const timetableData = await getOrFetchCached(
-      "timetable",
-      key,
-      TIMETABLE_CACHE_TTL_MS,
-      () => tdxGet<RailODDailyTimetable[]>(
-        `/v2/Rail/THSR/DailyTimetable/OD/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}/${encodeURIComponent(date)}`,
-      ),
-      forceRefresh,
-    );
-    timetable = timetableData.value;
-  } catch {
-    // Timetable is optional enrichment; seat availability can still be used.
-  }
-  const times = new Map(timetable.map((entry) => [entry.DailyTrainInfo.TrainNo, entry]));
-  const seats = (seatData.value.AvailableSeats ?? []).map((seat) => {
-    const time = times.get(seat.TrainNo);
-    return {
-      ...seat,
-      DepartureTime: time?.OriginStopTime?.DepartureTime,
-      ArrivalTime: time?.DestinationStopTime?.ArrivalTime,
-    };
-  });
-
-  return { ...seatData, seats };
 }
 
 async function fetchFreeTrainNumbers(date: string, forceRefresh: boolean): Promise<Set<string>> {
@@ -208,13 +157,13 @@ async function makePlansForDate(
   departureStart: string,
   departureEnd: string,
 ): Promise<{ plans: SeatPlan[]; cached: boolean; stale: boolean; cachedAt: number }> {
-  const direct = await fetchSegment(origin, destination, date, forceRefresh);
+  const daily = await fetchDailySeatData(date, forceRefresh);
+  const direct = daily.getSegment(origin, destination);
   const selectedModes = new Set(selectedSeatModes);
   const optionsForSeat = (seat: AvailableSeat) => reservedOptions(seat).filter((option) => selectedModes.has(option.mode));
   const directPlans = direct.seats.flatMap((seat) => optionsForSeat(seat).map((option) => makePlan([segmentFromSeat(seat, option.mode, option.status)])));
   const plans: SeatPlan[] = [...directPlans];
 
-  const stationById = new Map(stations.map((station) => [station.StationID, station]));
   const orderedIds = stations.map((station) => station.StationID).sort((a, b) => {
     const aIndex = THSR_STATION_ORDER.indexOf(a);
     const bIndex = THSR_STATION_ORDER.indexOf(b);
@@ -226,18 +175,10 @@ async function makePlansForDate(
   const selectedIntermediateIds = new Set(selectedIntermediateStationIds);
   const intermediateIds = routeIntermediateIds.filter((stationId) => selectedIntermediateIds.has(stationId));
   let freeTrainNumbers: Set<string> | null = null;
-  let anyCached = direct.fromCache;
-  let anyStale = direct.stale;
-  let oldestCachedAt = direct.cachedAt;
 
   for (const split of intermediateIds) {
-    const [first, second] = await Promise.all([
-      fetchSegment(origin, split, date, forceRefresh),
-      fetchSegment(split, destination, date, forceRefresh),
-    ]);
-    anyCached = anyCached || first.fromCache || second.fromCache;
-    anyStale = anyStale || first.stale || second.stale;
-    oldestCachedAt = Math.min(oldestCachedAt, first.cachedAt, second.cachedAt);
+    const first = daily.getSegment(origin, split);
+    const second = daily.getSegment(split, destination);
     const firstByTrain = new Map(first.seats.map((seat) => [seat.TrainNo, seat]));
     const secondByTrain = new Map(second.seats.map((seat) => [seat.TrainNo, seat]));
 
@@ -296,7 +237,7 @@ async function makePlansForDate(
     const departure = `${date}T${plan.totalDepartureTime.slice(0, 5)}`;
     return departure >= departureStart && departure <= departureEnd;
   });
-  return { plans: sortPlans(plansInWindow), cached: anyCached, stale: anyStale, cachedAt: oldestCachedAt };
+  return { plans: sortPlans(plansInWindow), cached: daily.fromCache, stale: daily.stale, cachedAt: daily.cachedAt };
 }
 
 router.post("/", async (req, res) => {

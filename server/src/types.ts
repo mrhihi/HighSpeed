@@ -40,14 +40,13 @@ export interface RailStopTime {
   DepartureTime: string;
 }
 
-export interface RailODDailyTimetable {
+export interface RailDailyTimetable {
   TrainDate: string;
   DailyTrainInfo: {
     TrainNo: string;
     Direction: number;
   };
-  OriginStopTime: RailStopTime;
-  DestinationStopTime: RailStopTime;
+  StopTimes: RailStopTime[];
 }
 
 export interface DaySeatResult {
