@@ -1,142 +1,345 @@
-# 高鐵剩餘對號座位查詢
+# HighSpeed：高鐵座位查詢與購票規劃
 
-透過交通部 TDX（交通資料流通服務）平台提供的高鐵（THSR）API，查詢指定起訖站、指定日期（可一次查詢多天）
-的各車次對號座（標準席／商務席）即時剩餘座位狀態。
+HighSpeed 是一個以交通部 TDX（運輸資料流通服務）為資料來源的台灣高鐵（THSR）查詢工具。它可以查看指定起訖站、日期與時段的對號座狀態，也能依照座位狀況與轉乘條件，整理較容易購買的直達或分段方案。
 
-本專案分為兩個部分：
+本工具只提供資料查詢與購票建議，不會代為訂票、付款、鎖位或保證實際有座位。實際票況與購票結果請以高鐵官方訂票系統為準。
 
-- `server/`：Node.js + Express + TypeScript 後端代理。負責向 TDX 換取 OAuth2 access token（並快取）、
-  代理呼叫 TDX 高鐵相關 API，避免將 Client Secret 暴露在瀏覽器，並解決 CORS 問題。
-- `client/`：React + TypeScript（Vite）前端。提供起訖站選擇、日期輸入（支援「自訂多個日期」或
-  「日期範圍」兩種模式）與查詢結果呈現。
+## 功能總覽
 
-## 使用的 TDX API（定義於根目錄 `api.json`）
+### 純查詢
 
-- `GET /v2/Rail/THSR/Station`：取得高鐵所有車站清單。
-- `GET /v2/Rail/THSR/AvailableSeatStatus/Train/OD/{OriginStationID}/to/{DestinationStationID}/TrainDate/{TrainDate}`：
-  取得指定日期、指定起訖站之各車次對號座即時剩餘座位狀態。
-- `GET /v2/Rail/THSR/DailyTimetable/OD/{OriginStationID}/to/{DestinationStationID}/{TrainDate}`：
-  取得指定日期、指定起訖站之各車次發車/抵達時刻，後端會以車次號碼將此資料與座位狀態合併，
-  讓查詢結果同時顯示發車時間與抵達時間（此為 best-effort 合併，若時刻表查詢失敗，仍會顯示座位狀態，僅時間欄位顯示「—」）。
+- 查詢一段或多段行程，可快速建立去程、回程等來回條件。
+- 起站與迄站可互換。
+- 支援「自訂多個日期」與「日期範圍」兩種日期模式。
+- 可設定最早及最晚發車時間，過濾各日期的車次。
+- 顯示車次、發車時間、抵達時間，以及標準席與商務席狀態。
+- 支援依車次或發車時間篩選結果，並將連續的全無座車次收合顯示。
+- 可使用 60 秒內的本地快取，或按「強制更新」跳過座位快取。
+- 每個日期或行程獨立處理錯誤，不會因單日查詢失敗而隱藏其他結果。
 
-TDX API 採用 OAuth2 Client Credentials 授權方式，需要 Client Id / Client Secret。
+### 購票建議
 
-> **關於「剩餘座位數」的重要說明**：高鐵官方系統本身只透過 TDX 提供「座位狀態燈號」，
-> 並未提供確切剩餘張數。狀態代碼意義為：`O` = 尚有座位、`L` = 座位有限、`X` = 已無座位。
-> 本應用程式會將這些代碼轉換為中文文字燈號顯示，滑鼠移至燈號上可看到原始代碼。
+- 先找直達方案，再嘗試指定中間站的分段方案。
+- 可組合同一車次分段、不同車次轉乘，以及劃位與自由座搭配。
+- 標準席、商務席、自由座可複選。
+- 可設定最早/最晚出發日期時間、最小轉乘時間與最大轉乘時間。
+- 每個中間站都可個別勾選，避免查詢不需要的路段。
+- 每個日期最多顯示 3 個方案，並附上分段明細、轉乘時間、購票步驟與風險提醒。
+- 可儲存、更新、重新命名、刪除查詢條件，也可透過剪貼簿匯出/匯入條件 JSON。
 
-## 1. 申請 TDX 金鑰
+### 系統資訊
 
-1. 前往 [TDX 平台](https://tdx.transportdata.tw) 註冊會員帳號。
-2. 登入後至【會員中心 -> 資料服務 -> API金鑰】頁面，使用預設金鑰或建立新的金鑰，取得 `Client Id` 與
-   `Client Secret`。
+- 頁尾顯示瀏覽、純查詢與購票建議次數。
+- 頁面會即時顯示後端 TDX 呼叫次數、近一分鐘用量、處理中請求與限流冷卻狀態。
+
+## 系統架構
+
+```text
+HighSpeed/
+├── client/       React + TypeScript + Vite 前端
+├── server/       Node.js + Express + TypeScript 後端代理
+├── api.json      TDX OpenAPI 規格文件
+└── Makefile      前後端開發環境啟動指令
+```
+
+後端負責 OAuth2 token、TDX 代理、座位/時刻表/自由座查詢、快取、限流、購票方案組合、呼叫統計與網站使用統計。前端透過 Vite 開發代理呼叫 `/api/*`，開發時不需要在瀏覽器直接連線 TDX。
+
+## 前置需求
+
+- Node.js `20.19+` 或 `22.12+`（Vite 8 要求）
+- npm
+- TDX 帳號的 `Client Id` 與 `Client Secret`
+
+## 取得 TDX 金鑰
+
+1. 前往 [TDX 平台](https://tdx.transportdata.tw) 註冊或登入。
+2. 進入【會員中心 → 資料服務 → API 金鑰】。
+3. 取得或建立 API 金鑰，記下 `Client Id` 與 `Client Secret`。
+
+本專案使用的 TDX API 規格副本位於根目錄 [`api.json`](api.json)。
 
 ## 快速啟動
 
-在根目錄先完成 `server/.env` 設定並安裝前後端依賴後，執行：
-
-```bash
-make run
-```
-
-這會同時啟動後端與前端開發伺服器；按 `Ctrl+C` 會一起停止兩者。
-
-## 2. 設定並啟動後端 (`server/`)
+先安裝前後端依賴並設定後端環境變數：
 
 ```bash
 cd server
 cp .env.example .env
-# 編輯 .env，填入你的 TDX_CLIENT_ID 與 TDX_CLIENT_SECRET
+# 編輯 .env，填入 TDX_CLIENT_ID 與 TDX_CLIENT_SECRET
 npm install
-npm run dev
+
+cd ../client
+npm install
 ```
 
-後端預設會在 `http://localhost:4000` 提供以下 API：
+回到根目錄，同時啟動前後端開發伺服器：
 
-- `GET /api/health`：健康檢查
-- `GET /api/stations`：回傳高鐵車站清單
-- `POST /api/seats`：查詢座位，Request Body：
-  ```json
+```bash
+cd ..
+make run
+```
+
+開啟 <http://localhost:5173>。也可以分別在 `server/` 執行 `npm run dev`、在 `client/` 執行 `npm run dev`。
+
+| 服務 | 位址 |
+| --- | --- |
+| 前端 | `http://localhost:5173` |
+| 後端 | `http://localhost:4000` |
+| 健康檢查 | `http://localhost:4000/api/health` |
+
+## 環境變數
+
+從 [`server/.env.example`](server/.env.example) 複製設定。`TDX_CLIENT_ID` 與 `TDX_CLIENT_SECRET` 必須填入有效金鑰。
+
+| 變數 | 說明 | `.env.example` | 程式內建 fallback |
+| --- | --- | ---: | ---: |
+| `TDX_CLIENT_ID` | TDX Client Id | — | 必填 |
+| `TDX_CLIENT_SECRET` | TDX Client Secret | — | 必填 |
+| `PORT` | 後端監聽埠號 | `4000` | `4000` |
+| `TDX_MAX_REQUESTS_PER_SECOND` | 每秒最多 TDX 呼叫數 | `1` | `50` |
+| `TDX_MAX_REQUESTS_PER_MINUTE` | 每分鐘最多 TDX 呼叫數 | `5` | `20` |
+| `TDX_MIN_REQUEST_INTERVAL_MS` | 每次呼叫的最小間隔（毫秒） | `5000` | `5000` |
+| `TDX_MAX_429_RETRIES` | HTTP 429 的最多重試次數 | `2` | `2` |
+| `TDX_SEAT_CACHE_TTL_MS` | 座位狀態快取時效（毫秒） | `60000` | `60000` |
+| `TDX_TIMETABLE_CACHE_TTL_MS` | 時刻表快取時效（毫秒） | `86400000` | `86400000` |
+| `TDX_FREE_SEATING_CACHE_TTL_MS` | 自由座資料快取時效（毫秒） | `86400000` | `86400000` |
+
+`.env.example` 採較保守的 TDX 呼叫頻率；若刪除相關設定，才會使用程式內建 fallback。實際可用頻率仍受 TDX 帳號方案限制。
+
+## 使用方式
+
+### 純查詢
+
+1. 選擇起站與迄站，兩者不可相同。
+2. 選擇「自訂多個日期」或「日期範圍」。日期範圍會展開為範圍內每一天。
+3. 可選填最早與最晚發車時間；只填一個時會形成單邊限制。
+4. 如需來回查詢，按「新增行程」；新行程會預填上一段行程的反向起訖站。
+5. 按「查詢座位」。已有結果時，可按「強制更新」跳過座位快取。
+
+日期範圍的前端會提醒高鐵通常只提供當日起約 27 天內的座位資料；後端單次請求最多接受 60 個日期。超出 TDX 可查詢範圍時，可能得到空資料。
+
+座位狀態代碼：
+
+| 代碼 | 顯示 | 意義 |
+| --- | --- | --- |
+| `O` | 尚有座位 | TDX 回報仍有座位 |
+| `L` | 座位有限 | TDX 回報座位有限，建議盡快確認 |
+| `X` | 已無座位 | TDX 回報沒有對號座 |
+
+TDX 不提供精確剩餘張數，因此本工具顯示的是狀態等級，不是剩餘票數。時刻表會依車次號碼補上發車與抵達時間；若時刻表 API 失敗，座位資料仍會顯示，但時間可能是 `—`。
+
+### 購票建議
+
+1. 選擇起站、迄站與最早/最晚出發日期時間。
+2. 設定最小與最大轉乘時間。後端接受的最小值為 3 分鐘，最大轉乘時間上限為 240 分鐘。
+3. 選擇要嘗試的中間站；預設會勾選路線上的中間站。勾選越多，可能需要查詢的路段越多。
+4. 選擇要組合的票種，至少選一種：標準席、商務席或自由座。
+5. 按「產生購票建議」，依每個日期查看最多 3 個方案。
+
+方案排序會優先考慮直達，再考慮實際轉乘與其他分段類型，並降低座位有限或自由座方案的優先級。自由座只代表 TDX 回報該車次有自由座車廂，不保證現場一定有座位；每個方案的購票步驟仍需在官方通路重新確認。
+
+查詢與購票建議條件可使用「已儲存條件」管理。條件儲存在瀏覽器的 `localStorage`，剪貼簿功能匯出的內容是 JSON，不會上傳到後端。
+
+## 後端 API
+
+所有 API 預設位於 `http://localhost:4000`。錯誤回應通常為：
+
+```json
+{ "error": "錯誤原因" }
+```
+
+### `GET /api/health`
+
+確認後端程序是否正常，回應：
+
+```json
+{ "status": "ok" }
+```
+
+### `GET /api/stations`
+
+取得 TDX 高鐵車站清單：
+
+```json
+[
   {
-    "originStationId": "1000",
-    "destinationStationId": "1020",
-    "dates": ["2024-06-01", "2024-06-02"],
-    "forceRefresh": false
+    "StationID": "1000",
+    "StationName": { "Zh_tw": "台北", "En": "Taipei" },
+    "StationCode": "TPE"
   }
-  ```
-  Response：
-  ```json
-  {
-    "results": [
-      { "date": "2024-06-01", "seats": [ /* AvailableSeat[] */ ], "cached": true, "cachedAt": "2024-06-01T00:00:00.000Z" },
-      { "date": "2024-06-02", "seats": [], "error": "查詢失敗原因（若有）" }
-    ]
-  }
-  ```
+]
+```
 
-座位資料會以起訖站與日期為 key 儲存在後端 `server/data/cache/`，有效快取 60 秒；時刻表與車站清單會使用較長期快取。相同資料的並發請求也會共用一次 TDX 呼叫。前端預設使用快取，按「強制更新」才會送出 `forceRefresh: true`。若 TDX 暫時失敗但本地仍有舊資料，回應會標示 `stale: true` 並使用過期資料。
+車站清單會永久儲存在後端快取，通常只有本機沒有資料時才呼叫 TDX。
 
-- `POST /api/seat-plans`：產生智慧購票建議。輸入起訖站、日期，以及最早／最晚出發日期時間（`departureStart`、`departureEnd`）、最小／最大轉乘分鐘數、要嘗試的中間站 `selectedIntermediateStationIds` 與票種；系統只查詢勾選的中間站，並回傳最多 3 個不同類型的方案。此端點只提供建議，不會代為訂票或鎖位。
+### `POST /api/seats`
 
-若未設定 `TDX_CLIENT_ID` / `TDX_CLIENT_SECRET`，API 會回傳明確錯誤訊息，提示需先完成 `.env` 設定。
+查詢指定起訖站與日期的對號座狀態。`dates` 必須是 `yyyy-MM-dd` 字串陣列，單次最多 60 個日期；`forceRefresh` 選填，預設為 `false`。
 
-後端對實際送出的 TDX API 呼叫有內建節流：預設每秒最多 50 次、每分鐘最多 20 次，且每次呼叫至少間隔 5 秒；可在 `server/.env` 以 `TDX_MAX_REQUESTS_PER_SECOND`、`TDX_MAX_REQUESTS_PER_MINUTE`、`TDX_MIN_REQUEST_INTERVAL_MS` 與 `TDX_MAX_429_RETRIES` 調整。限流狀態會寫入 `server/data/tdx-rate-limit.json`，讓同一台機器上的多個後端程序共用額度；若收到 429，會暫停送出新請求 60 秒並自動重試，預設最多重試 2 次。命中本地快取的請求不會消耗 TDX 呼叫額度。
+Request：
 
-`GET /api/metrics/tdx` 可查看後台 TDX 呼叫次數、近一分鐘用量、處理中請求與限流狀態；前端透過 `/api/metrics/tdx/stream` 使用 Comet long polling，在統計有變化時立即更新，沒有固定頻率輪詢。相同條件的快取讀取也有跨程序鎖，避免多個同時請求在快取寫入前重複呼叫 TDX。座位、時刻表與自由座快取時效可分別用 `TDX_SEAT_CACHE_TTL_MS`、`TDX_TIMETABLE_CACHE_TTL_MS`、`TDX_FREE_SEATING_CACHE_TTL_MS` 設定；車站清單為永久快取。
+```json
+{
+  "originStationId": "1000",
+  "destinationStationId": "1020",
+  "dates": ["2026-09-20", "2026-09-21"],
+  "forceRefresh": false
+}
+```
 
-頁尾的瀏覽、純查詢與購票建議次數會持久化儲存於 `server/data/usage-stats.json`，由 `/api/usage` 與 `/api/usage/events` 提供統計資料，不會增加 TDX 呼叫次數。
+Response：
 
-## 3. 啟動前端 (`client/`)
+```json
+{
+  "results": [
+    {
+      "date": "2026-09-20",
+      "seats": [
+        {
+          "TrainNo": "601",
+          "Direction": 0,
+          "StandardSeatStatus": "O",
+          "BusinessSeatStatus": "L",
+          "DepartureTime": "08:00:00",
+          "ArrivalTime": "09:29:00"
+        }
+      ],
+      "cached": false,
+      "stale": false,
+      "cachedAt": "2026-09-10T03:00:00.000Z"
+    },
+    {
+      "date": "2026-09-21",
+      "seats": [],
+      "error": "該日期查詢失敗原因"
+    }
+  ]
+}
+```
 
-另開一個終端機視窗：
+日期結果會逐日處理；單日失敗會放在該日的 `error`，不會使其他日期整批失敗。若 TDX 更新失敗但已有舊快取，會回傳舊資料並標示 `stale: true`。
+
+### `POST /api/seat-plans`
+
+依日期、出發時間、票種、中間站及轉乘時間產生購票建議。此端點不會訂票或鎖位。
+
+Request：
+
+```json
+{
+  "originStationId": "1000",
+  "destinationStationId": "1020",
+  "dates": ["2026-09-20"],
+  "departureStart": "2026-09-20T17:30",
+  "departureEnd": "2026-09-21T12:00",
+  "minTransferMinutes": 15,
+  "maxTransferMinutes": 120,
+  "selectedIntermediateStationIds": ["1010"],
+  "selectedSeatModes": ["reserved-standard", "reserved-business", "free"],
+  "forceRefresh": false
+}
+```
+
+必要欄位與限制：
+
+- `originStationId` 與 `destinationStationId` 必須不同。
+- `dates` 必須至少一個 `yyyy-MM-dd` 日期。
+- `departureStart`、`departureEnd` 格式為 `yyyy-MM-ddTHH:mm`，且前者不可晚於後者。
+- `minTransferMinutes` 為 3–120 分鐘；`maxTransferMinutes` 不可小於最小值，且上限為 240 分鐘。
+- `selectedSeatModes` 至少要有一項：`reserved-standard`、`reserved-business`、`free`。
+
+每個日期的回應包含 `plans` 陣列。方案欄位包括 `rank`、整體出發/抵達時間、`transfers`、`transferMinutes`、分段 `segments`、`warnings` 與 `purchaseSteps`。每個 segment 會描述起訖站、車次、時間、票種與座位狀態。
+
+### `GET /api/metrics/tdx`
+
+取得後端程序的 TDX 呼叫統計與限流狀態，包括 `totalCalls`、`successfulCalls`、`failedCalls`、`inFlight`、`callsInLastMinute`、`maxRequestsPerMinute`、`minimumRequestIntervalMs` 與 `cooldownUntil`。
+
+### `GET /api/metrics/tdx/stream?since={version}`
+
+以 Comet long polling 等待 TDX 統計變化；有變化或等待逾時後回傳目前統計。前端使用此端點更新頁面狀態，不採固定頻率輪詢。
+
+### `GET /api/usage`
+
+取得持久化的網站使用統計：
+
+```json
+{ "views": 123, "queries": 45, "recommendations": 12 }
+```
+
+### `POST /api/usage/events`
+
+記錄一種事件並回傳最新統計。可用事件為 `view`、`query`、`recommendation`：
+
+```json
+{ "event": "query" }
+```
+
+這些統計不會增加 TDX 呼叫次數。
+
+## 快取、限流與資料檔案
+
+- 座位狀態預設快取 60 秒；時刻表與自由座資料預設快取 24 小時；車站清單永久快取。
+- 命中新鮮快取的請求不會呼叫 TDX。
+- 同一條件的並發請求會共用一次上游呼叫；跨後端程序也使用檔案鎖避免重複請求。
+- TDX 呼叫會依每秒、每分鐘及最小間隔限制排隊。收到 HTTP 429 時，會進入約 60 秒冷卻並依設定自動重試。
+- 若上游更新失敗但有舊資料，座位與方案 API 會盡量回傳過期資料並標示 `stale`；完全沒有快取時才會回傳錯誤。
+
+執行期間會產生以下資料：
+
+| 路徑 | 用途 |
+| --- | --- |
+| `server/data/cache/` | 車站、座位、時刻表與自由座快取 |
+| `server/data/tdx-rate-limit.json` | 多個後端程序共用的 TDX 限流狀態 |
+| `server/data/usage-stats.json` | 瀏覽、查詢與建議次數 |
+
+這些是執行期資料，不應提交到版本控制；專案的 `.gitignore` 已排除本地快取、環境變數與建置產物。
+
+## 建置與正式部署
+
+建置後端：
+
+```bash
+cd server
+npm run build
+npm start
+```
+
+建置前端：
 
 ```bash
 cd client
-npm install
-npm run dev
+npm run build
 ```
 
-Vite 開發伺服器預設在 `http://localhost:5173`，並已設定將 `/api/*` 的請求代理到後端
-`http://localhost:4000`（見 `client/vite.config.ts`），因此開發時前後端需同時啟動。
+前端靜態檔案會輸出到 `client/dist`，可部署至靜態網站主機。正式環境需要將前端的 `/api` 反向代理到後端，例如後端服務所在的 `http://localhost:4000`；同時必須在後端主機設定 TDX 金鑰與環境變數。
 
-瀏覽器開啟 `http://localhost:5173` 即可使用：
-
-介面以「行程」為單位，一次可查詢一段或多段行程（例如去程、回程各一段），每段行程都有各自獨立的起訖站、日期與時間條件：
-
-1. 每段行程可各自設定：
-   - **起站與迄站**（可用中間的 ⇄ 按鈕互換）。
-   - **日期查詢模式**：
-     - **自訂多個日期**：可自由新增/刪除多個不連續的查詢日期。
-     - **日期範圍**：輸入起始與結束日期，系統自動展開為範圍內每一天。
-       （TDX 僅提供當日起 27 天內的座位資料，超出此範圍的日期可能查無資料，介面會顯示提醒。）
-   - **最早出發時間／最晚出發時間**（皆為選填）：可只設定其中一個，或同時設定形成一個時間區間；
-     此區間會套用於該行程所選的每一個查詢日期，過濾掉不在區間內的車次。
-2. 點擊「＋ 新增行程（例如來回車次）」可新增下一段行程；新行程會預設把上一段行程的起訖站對調，
-   方便快速輸入來回查詢（例如去程 台北→左營、回程 左營→台北，各自搭配不同日期與時間範圍）。
-   若不需要，可用「移除此行程」刪除多餘的行程（至少需保留一段）。
-3. 點擊「查詢座位」，各行程會分別呼叫 API 查詢；若有多段行程，結果會以「行程 1」「行程 2」…分區塊顯示，
-   每個區塊內的結果再依日期分組並排顯示（寬螢幕時每列可並排 2~3 天，避免長時間往下捲動），
-   各車次會顯示**發車時間、抵達時間**與標準席／商務席剩餘狀態
-   （狀態以「尚有座位／座位有限／已無座位」文字燈號呈現，並依發車時間排序）；
-   若某一天或某一段行程查詢失敗，不會影響其他天／其他行程的結果顯示。
-
-## 4. 建置正式版
+前端指令：
 
 ```bash
-# 後端
-cd server && npm run build && npm start
-
-# 前端
-cd client && npm run build
-# 建置後的靜態檔案在 client/dist，可自行部署至任意靜態網站主機，
-# 並將 /api 反向代理至後端伺服器。
+npm run dev       # 開發伺服器
+npm run build     # TypeScript 檢查並建置正式版
+npm run lint      # Oxlint
+npm run preview   # 預覽建置結果
 ```
 
-## 專案結構
+後端指令：
 
+```bash
+npm run dev       # tsx watch 開發模式
+npm run build     # TypeScript 編譯至 dist
+npm start         # 執行 dist/index.js
 ```
-/HighSpeed
-  api.json          # TDX OpenAPI 規格文件
-  server/            # Node + Express + TypeScript 後端代理
-  client/            # React + TypeScript (Vite) 前端
-```
+
+## 限制與注意事項
+
+- TDX 的座位狀態不是精確剩餘張數，`O/L/X` 僅代表座位等級狀態。
+- 座位資料受高鐵開放查詢天數與 TDX 帳號方案限制；查無資料不一定代表完全沒有班次。
+- 時刻表補充資料採 best-effort，可能因 TDX 暫時失敗而缺少時間。
+- 自由座方案不能保證現場有座位，請將它視為候選購票方式。
+- 購票建議是依查詢當下資料組合出的參考方案，票況可能在產生建議後立即改變。
+- `server/.env` 含有 TDX Secret，請勿提交、公開或放入前端程式碼。
+- TDX 限流設定越保守，查詢所需時間可能越長；一次勾選較多中間站或日期也會增加上游查詢量。
+
+## 資料來源
+
+資料來源為 [交通部 TDX 運輸資料流通服務](https://tdx.transportdata.tw)。請遵守 TDX 平台的使用規範、API 金鑰與頻率限制。
