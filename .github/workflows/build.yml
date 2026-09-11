@@ -82,6 +82,7 @@ jobs:
         run: |
           timeout 30s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
             -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
+            -o PubkeyAcceptedAlgorithms=ssh-ed25519 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             'mkdir -p /home/ubuntu/Workspace/highspeed/server/dist /home/ubuntu/Workspace/highspeed/client/dist'
@@ -92,6 +93,7 @@ jobs:
           tar -C client/dist -czf - . | \
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
               -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
+              -o PubkeyAcceptedAlgorithms=ssh-ed25519 \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
               "$DEPLOY_USER@$DEPLOY_HOST" \
               'tmp=$(mktemp -d /tmp/highspeed-client.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/client/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/client/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/client/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/client/dist'
@@ -102,6 +104,7 @@ jobs:
           tar -C server/dist -czf - . | \
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
               -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
+              -o PubkeyAcceptedAlgorithms=ssh-ed25519 \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
               "$DEPLOY_USER@$DEPLOY_HOST" \
               'tmp=$(mktemp -d /tmp/highspeed-server.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/server/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/server/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/server/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/server/dist'
@@ -111,6 +114,7 @@ jobs:
         run: |
           timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
             -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
+            -o PubkeyAcceptedAlgorithms=ssh-ed25519 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             'bash -lc '\''if [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; nvm use default >/dev/null; fi; command -v node; pm2 restart highspeed-server --update-env; for attempt in {1..30}; do if curl --fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:4000/api/health; then exit 0; fi; sleep 1; done; echo "Health check failed after 30 attempts"; pm2 status; pm2 logs highspeed-server --lines 50 --nostream; exit 1'\'''
