@@ -61,17 +61,27 @@ jobs:
           curl -4 -fsS --connect-timeout 10 --max-time 15 https://api.ipify.org
           echo
 
+      - name: Debug SSH host key algorithms
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          ssh -V
+          echo "Supported host key algorithms:"
+          ssh -Q HostKeyAlgorithms
+          echo "Effective host key algorithms for deployment host:"
+          ssh -G "$DEPLOY_HOST" | grep -i '^hostkeyalgorithms '
+
       - name: Trust deployment host
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          timeout 20s ssh-keyscan -4 -T 10 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          timeout 20s ssh-keyscan -4 -T 10 -t ed25519,ecdsa,rsa -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
       - name: Prepare remote directories
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           timeout 30s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
+            -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             'mkdir -p /home/ubuntu/Workspace/highspeed/server/dist /home/ubuntu/Workspace/highspeed/client/dist'
@@ -81,6 +91,7 @@ jobs:
         run: |
           tar -C client/dist -czf - . | \
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
+              -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
               "$DEPLOY_USER@$DEPLOY_HOST" \
               'tmp=$(mktemp -d /tmp/highspeed-client.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/client/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/client/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/client/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/client/dist'
@@ -90,6 +101,7 @@ jobs:
         run: |
           tar -C server/dist -czf - . | \
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
+              -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
               "$DEPLOY_USER@$DEPLOY_HOST" \
               'tmp=$(mktemp -d /tmp/highspeed-server.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/server/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/server/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/server/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/server/dist'
@@ -98,6 +110,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
+            -o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             'bash -lc '\''if [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; nvm use default >/dev/null; fi; command -v node; pm2 restart highspeed-server --update-env; for attempt in {1..30}; do if curl --fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:4000/api/health; then exit 0; fi; sleep 1; done; echo "Health check failed after 30 attempts"; pm2 status; pm2 logs highspeed-server --lines 50 --nostream; exit 1'\'''
