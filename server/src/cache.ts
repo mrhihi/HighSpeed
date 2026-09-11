@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface CacheEntry<T> {
@@ -15,6 +15,11 @@ export interface CacheLookup<T> {
 
 const cacheDirectory = path.join(__dirname, "..", "data", "cache");
 const inFlight = new Map<string, Promise<unknown>>();
+
+export interface CacheCleanupRule {
+  prefix: string;
+  maxAgeMs: number;
+}
 
 function lockPath(namespace: string, key: string): string {
   return `${filePath(namespace, key)}.lock`;
@@ -65,6 +70,11 @@ async function writeEntry<T>(namespace: string, key: string, value: T): Promise<
   const entry: CacheEntry<T> = { value, cachedAt: Date.now() };
   const target = filePath(namespace, key);
   const temporary = `${target}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await unlink(target);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
   await writeFile(temporary, JSON.stringify(entry), "utf8");
   await rename(temporary, target);
   return entry;
@@ -119,4 +129,38 @@ export async function getOrFetchCached<T>(
   } finally {
     if (inFlight.get(requestKey) === request) inFlight.delete(requestKey);
   }
+}
+
+/** Deletes expired JSON cache files while retaining a grace period for stale fallback. */
+export async function cleanupExpiredCacheFiles(
+  rules: CacheCleanupRule[],
+  gracePeriodMs: number,
+): Promise<number> {
+  let filenames: string[];
+  try {
+    filenames = await readdir(cacheDirectory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+    throw error;
+  }
+
+  const now = Date.now();
+  let removed = 0;
+  for (const filename of filenames) {
+    if (!filename.endsWith(".json")) continue;
+    const rule = rules.find((candidate) => filename.startsWith(candidate.prefix));
+    if (!rule) continue;
+
+    const file = path.join(cacheDirectory, filename);
+    try {
+      const entry = JSON.parse(await readFile(file, "utf8")) as Partial<CacheEntry<unknown>>;
+      if (typeof entry.cachedAt !== "number" || now - entry.cachedAt <= rule.maxAgeMs + gracePeriodMs) continue;
+      await unlink(file);
+      removed += 1;
+    } catch (error) {
+      // Ignore a file that disappeared or is being replaced by a writer.
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") continue;
+    }
+  }
+  return removed;
 }

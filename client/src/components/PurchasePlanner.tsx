@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchSeatPlans, recordUsageEvent } from "../api/client";
-import { expandDateRange, isTimeString, todayString } from "../utils/dates";
+import { expandDateRange, isPastDate, isTimeString, todayString } from "../utils/dates";
 import type { PlannerDayResult, SeatPlan, Station } from "../types";
 import { LoadingErrorState } from "./LoadingErrorState";
 import { TimeInput } from "./TimeInput";
@@ -159,8 +159,27 @@ export function PurchasePlanner({ stations, stationsLoading, stationsError, onUs
   const dates = expandDateRange(earliestDate, latestDate);
   const departureStart = `${earliestDate}T${earliestTime}`;
   const departureEnd = `${latestDate}T${latestTime}`;
+  const today = todayString();
+  const earliestDatePast = isPastDate(earliestDate, today);
+  const latestDatePast = isPastDate(latestDate, today);
   const validTimes = isTimeString(earliestTime) && isTimeString(latestTime);
-  const canPlan = Boolean(originStationId && destinationStationId && originStationId !== destinationStationId && earliestDate <= latestDate && validTimes && dates.length > 0 && selectedSeatModes.length > 0 && maxTransferMinutes >= transferMinutes) && !loading;
+  const canPlan = Boolean(originStationId && destinationStationId && originStationId !== destinationStationId && earliestDate <= latestDate && !earliestDatePast && !latestDatePast && validTimes && dates.length > 0 && selectedSeatModes.length > 0 && maxTransferMinutes >= transferMinutes) && !loading;
+
+  const clearConditions = () => {
+    preserveLoadedStations.current = false;
+    setOriginStationId("");
+    setDestinationStationId("");
+    setEarliestDate(todayString());
+    setEarliestTime("00:00");
+    setLatestDate(todayString());
+    setLatestTime("23:59");
+    setTransferMinutes(15);
+    setMaxTransferMinutes(120);
+    setSelectedIntermediateStationIds([]);
+    setSelectedSeatModes(["reserved-standard", "reserved-business", "free"]);
+    setResults([]);
+    setError(null);
+  };
 
   const handlePlan = async (forceRefresh = false) => {
     if (!canPlan) return;
@@ -184,6 +203,7 @@ export function PurchasePlanner({ stations, stationsLoading, stationsError, onUs
         storageKey="highspeed.saved.planner-conditions"
         label="購票建議"
         value={{ originStationId, destinationStationId, earliestDate, earliestTime, latestDate, latestTime, transferMinutes, maxTransferMinutes, selectedIntermediateStationIds, selectedSeatModes }}
+        onClear={clearConditions}
         onLoad={(saved) => {
           preserveLoadedStations.current = true;
           setOriginStationId(saved.originStationId);
@@ -215,9 +235,9 @@ export function PurchasePlanner({ stations, stationsLoading, stationsError, onUs
           <label className="field"><span>迄站</span><select value={destinationStationId} disabled={stationsLoading || Boolean(stationsError)} onChange={(e) => setDestinationStationId(e.target.value)}><option value="">請選擇迄站</option>{stations.map((station) => <option key={station.StationID} value={station.StationID}>{station.StationName.Zh_tw}</option>)}</select></label>
         </div>
         <div className="planner-fields-grid">
-          <label className="field"><span>最早出發日期</span><input type="date" value={earliestDate} onChange={(e) => setEarliestDate(e.target.value)} /></label>
+          <label className="field"><span>最早出發日期</span><input type="date" value={earliestDate} className={earliestDatePast ? "date-input-past" : ""} aria-invalid={earliestDatePast} onChange={(e) => setEarliestDate(e.target.value)} />{earliestDatePast && <span className="past-date-warning">日期已過期</span>}</label>
           <label className="field"><span>最早出發時間</span><TimeInput value={earliestTime} ariaLabel="最早出發時間" onChange={setEarliestTime} /></label>
-          <label className="field"><span>最晚出發日期</span><input type="date" value={latestDate} onChange={(e) => setLatestDate(e.target.value)} /></label>
+          <label className="field"><span>最晚出發日期</span><input type="date" value={latestDate} className={latestDatePast ? "date-input-past" : ""} aria-invalid={latestDatePast} onChange={(e) => setLatestDate(e.target.value)} />{latestDatePast && <span className="past-date-warning">日期已過期</span>}</label>
           <label className="field"><span>最晚出發時間</span><TimeInput value={latestTime} ariaLabel="最晚出發時間" onChange={setLatestTime} /></label>
           <label className="field"><span>最小轉乘時間</span><select value={transferMinutes} onChange={(e) => setTransferMinutes(Number(e.target.value))}><option value={3}>3 分鐘</option><option value={10}>10 分鐘</option><option value={15}>15 分鐘</option><option value={20}>20 分鐘</option><option value={30}>30 分鐘</option></select></label>
           <label className="field"><span>最大轉乘時間</span><select value={maxTransferMinutes} onChange={(e) => setMaxTransferMinutes(Number(e.target.value))}><option value={15}>15 分鐘</option><option value={30}>30 分鐘</option><option value={60}>60 分鐘</option><option value={90}>90 分鐘</option><option value={120}>120 分鐘</option><option value={180}>180 分鐘</option><option value={240}>240 分鐘</option></select></label>

@@ -6,7 +6,7 @@ import { TripLegForm } from "./components/TripLegForm";
 import { SeatResultTable } from "./components/SeatResultTable";
 import { LoadingErrorState } from "./components/LoadingErrorState";
 import { SavedConditions } from "./components/SavedConditions";
-import { expandDateRange, isTimeString, todayString } from "./utils/dates";
+import { expandDateRange, isPastDate, isTimeString, replaceTripLegDates, todayString } from "./utils/dates";
 import type { LegSearchResult, Station, TripLeg } from "./types";
 import "./App.css";
 
@@ -65,6 +65,7 @@ function App() {
   const [legResults, setLegResults] = useState<LegSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [skipCache, setSkipCache] = useState(false);
   const [activeWorkspace, setActiveWorkspace] = useState<"search" | "planner">("search");
   const [tdxMetrics, setTdxMetrics] = useState<TdxMetrics | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
@@ -142,15 +143,18 @@ function App() {
     leg.originStationId !== leg.destinationStationId &&
     (!leg.minTime || isTimeString(leg.minTime)) &&
     (!leg.maxTime || isTimeString(leg.maxTime)) &&
-    resolveDates(leg).length > 0;
+    resolveDates(leg).length > 0 &&
+    resolveDates(leg).every((date) => !isPastDate(date));
 
   const canSearch = legs.length > 0 && legs.every(legIsValid) && !searchLoading;
 
-  const handleSearch = async (forceRefresh = false) => {
+  const handleSearch = async () => {
     if (!canSearch) return;
+    const forceRefresh = skipCache;
     recordUsageEvent("query").then(setUsageStats).catch(() => undefined);
     setSearchLoading(true);
     setSearchError(null);
+    setLegResults([]);
 
     const outcomes = await Promise.all(
       legs.map(async (leg): Promise<LegSearchResult> => {
@@ -193,6 +197,7 @@ function App() {
 
     setLegResults(outcomes);
     setSearchLoading(false);
+    setSkipCache(false);
     if (outcomes.every((o) => o.error)) {
       setSearchError("所有行程查詢皆失敗，請稍後再試");
     }
@@ -201,28 +206,42 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <p className="app-kicker">HIGHSPEED · THSR</p>
-        <h1>高鐵座位查詢與購票規劃</h1>
-        <p className="subtitle">
-          先查看即時座位狀態，再依票況選擇最適合的購票方式
-        </p>
+        <img className="app-logo" src="/thsr.png" alt="HighSpeed 高鐵列車圖示" />
+        <div className="app-header-copy">
+          <p className="app-kicker">HIGHSPEED · THSR</p>
+          <h1>高鐵座位查詢與購票規劃</h1>
+          <p className="subtitle">
+            先查看即時座位狀態，再依票況選擇最適合的購票方式
+          </p>
+        </div>
       </header>
 
       <main className="app-main">
         {stationsError && <p className="status-message status-error">{stationsError}</p>}
         <WorkspaceTabs active={activeWorkspace} onChange={setActiveWorkspace} />
         <div className="search-workspace" role="tabpanel" aria-label="純查詢" hidden={activeWorkspace !== "search"}>
+          <SavedConditions
+            storageKey="highspeed.saved.search-conditions"
+            value={legs}
+            label="純查詢"
+            onClear={() => {
+              setLegResults([]);
+              setSearchError(null);
+              setLegs([createLeg()]);
+            }}
+            onLoad={(savedLegs) => {
+              setLegResults([]);
+              setLegs(savedLegs.map((leg) => ({ ...leg, id: createLegId() })));
+            }}
+            onLoadWithToday={(savedLegs) => {
+              setLegResults([]);
+              setLegs(replaceTripLegDates(savedLegs).map((leg) => ({ ...leg, id: createLegId() })));
+            }}
+          />
           <div className="workspace-heading">
             <div><p className="eyebrow">RAW AVAILABILITY</p><h2>純查詢</h2></div>
             <div className="workspace-heading-tools">
               <p>查看 TDX 原始對號座狀態，不自動組合購票方案。</p>
-              <SavedConditions
-                compact
-                storageKey="highspeed.saved.search-conditions"
-                value={legs}
-                label="純查詢"
-                onLoad={(savedLegs) => setLegs(savedLegs.map((leg) => ({ ...leg, id: createLegId() })))}
-              />
             </div>
           </div>
           <div className="search-form">
@@ -240,18 +259,24 @@ function App() {
             />
           ))}
 
-          <button type="button" className="add-leg-button" onClick={addLeg} disabled={searchLoading}>
-            ＋ 新增行程（例如來回車次）
-          </button>
-
-          <button type="button" className="search-button" onClick={() => handleSearch()} disabled={!canSearch}>
-            查詢座位
-          </button>
-          {legResults.length > 0 && !searchLoading && (
-            <button type="button" className="refresh-button" onClick={() => handleSearch(true)} disabled={!canSearch}>
-              ↻ 強制更新（跳過 60 秒快取）
+          <div className="search-actions">
+            <button type="button" className="add-leg-button" onClick={addLeg} disabled={searchLoading}>
+              ＋ 新增行程
             </button>
-          )}
+            <button type="button" className="search-button" onClick={handleSearch} disabled={!canSearch}>
+              查詢座位
+            </button>
+            <label className="cache-toggle">
+              <input
+                type="checkbox"
+                checked={skipCache}
+                onChange={(event) => setSkipCache(event.target.checked)}
+                disabled={searchLoading}
+              />
+              <span className="cache-toggle-slider" aria-hidden="true" />
+              <span>跳過 60 秒快取</span>
+            </label>
+          </div>
 
           <LoadingErrorState loading={searchLoading} error={searchError} />
           </div>

@@ -1,4 +1,4 @@
-import { todayString } from "../utils/dates";
+import { isPastDate, todayString } from "../utils/dates";
 
 interface MultiDatePickerProps {
   dates: string[];
@@ -7,6 +7,7 @@ interface MultiDatePickerProps {
 }
 
 export function MultiDatePicker({ dates, onChange, disabled }: MultiDatePickerProps) {
+  const today = todayString();
   const handleDateChange = (index: number, value: string) => {
     const next = [...dates];
     next[index] = value;
@@ -23,11 +24,14 @@ export function MultiDatePicker({ dates, onChange, disabled }: MultiDatePickerPr
 
   return (
     <div className="multi-date-picker">
-      {dates.map((date, index) => (
-        <div className="multi-date-row" key={index}>
+      <div className="multi-date-list">
+        {dates.map((date, index) => (
+          <div className="multi-date-row" key={index}>
           <input
             type="date"
             value={date}
+            className={isPastDate(date, today) ? "date-input-past" : ""}
+            aria-invalid={isPastDate(date, today)}
             disabled={disabled}
             onChange={(e) => handleDateChange(index, e.target.value)}
           />
@@ -40,11 +44,20 @@ export function MultiDatePicker({ dates, onChange, disabled }: MultiDatePickerPr
           >
             ✕
           </button>
-        </div>
-      ))}
-      <button type="button" className="add-button" onClick={handleAdd} disabled={disabled}>
-        + 新增日期
-      </button>
+          {isPastDate(date, today) && <span className="past-date-warning">日期已過期，無法查詢</span>}
+          </div>
+        ))}
+        <button
+          type="button"
+          className="add-button add-date-button"
+          onClick={handleAdd}
+          disabled={disabled}
+          aria-label="新增日期"
+          title="新增日期"
+        >
+          ＋
+        </button>
+      </div>
     </div>
   );
 }

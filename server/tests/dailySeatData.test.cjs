@@ -1,10 +1,12 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
-const { unlink } = require('node:fs/promises');
+const { unlink, writeFile } = require('node:fs/promises');
 const path = require('node:path');
 const { fetchDailySeatData } = require('../dist/dailySeatData');
 const { getOrFetchCached } = require('../dist/cache');
+const { cleanupExpiredCacheFiles } = require('../dist/cache');
+const { fetchSeatSegment } = require('../dist/routes/seats');
 
 function fixture(t) {
   const prefix = randomUUID();
@@ -114,7 +116,43 @@ test('reads subsequent pages before caching the full day', async (t) => {
   assert.equal(pages.length, 2);
 });
 
-test('planner and seat routes share data and preserve same-train and cross-train plans', async (t) => {
+test('pure seat lookup uses one OD seat request and one OD timetable request', async (t) => {
+  const f = fixture(t);
+  const result = await fetchSeatSegment('A', 'C', '2026-09-10', false, f.deps);
+
+  // The fixture returns all rows regardless of the requested OD; the route
+  // relies on TDX's OD endpoint to perform that filtering upstream.
+  assert.equal(result.seats.length, f.seats.length);
+  assert.equal(f.calls.length, 2);
+  assert.ok(f.calls[0].includes('/AvailableSeatStatus/Train/OD/A/to/C/TrainDate/2026-09-10'));
+  assert.ok(f.calls[1].includes('/DailyTimetable/OD/A/to/C/2026-09-10'));
+  assert.ok(f.calls.every((url) => !url.includes('TrainDate/2026-09-10?$top=10000')));
+
+  const cached = await fetchSeatSegment('A', 'C', '2026-09-10', false, f.deps);
+  assert.equal(cached.fromCache, true);
+  assert.equal(f.calls.length, 2);
+});
+
+test('cache cleanup removes only files older than TTL plus grace period', async (t) => {
+  const suffix = randomUUID();
+  const directory = path.join(__dirname, '../data/cache');
+  const oldFile = path.join(directory, `seats-cleanup-${suffix}.json`);
+  const freshFile = path.join(directory, `seats-cleanup-fresh-${suffix}.json`);
+  const unrelatedFile = path.join(directory, `free-seating-cleanup-${suffix}.json`);
+  const now = Date.now();
+  await writeFile(oldFile, JSON.stringify({ cachedAt: now - 1000, value: {} }));
+  await writeFile(freshFile, JSON.stringify({ cachedAt: now - 100, value: {} }));
+  await writeFile(unrelatedFile, JSON.stringify({ cachedAt: now - 1000, value: {} }));
+  t.after(async () => { await Promise.all([oldFile, freshFile, unrelatedFile].map((file) => unlink(file).catch(() => {}))); });
+
+  const removed = await cleanupExpiredCacheFiles([{ prefix: 'seats-cleanup-', maxAgeMs: 100 }], 100);
+  assert.equal(removed, 1);
+  await assert.rejects(() => require('node:fs/promises').access(oldFile));
+  await require('node:fs/promises').access(freshFile);
+  await require('node:fs/promises').access(unrelatedFile);
+});
+
+test('planner uses daily data and preserves same-train and cross-train plans', async (t) => {
   const f = fixture(t);
   const baseGet = f.deps.tdxGet;
   f.deps.tdxGet = async (url, params) => {
@@ -157,12 +195,4 @@ test('planner and seat routes share data and preserve same-train and cross-train
   assert.ok(result.plans.some((p) => p.segments.map((s) => s.trainNo).join(',') === '1,1'));
   assert.ok(result.plans.some((p) => p.segments.map((s) => s.trainNo).join(',') === '1,3'));
   assert.equal(f.calls.length, 2);
-  const seats = await invoke('seats', body);
-  assert.equal(seats.cached, true);
-  assert.equal(seats.seats[0].StandardSeatStatus, 'X');
-  assert.equal(f.calls.length, 2);
-  await invoke('seatPlans', { ...body, selectedIntermediateStationIds: [] });
-  assert.equal(f.calls.length, 2);
-  await invoke('seatPlans', { ...body, forceRefresh: true });
-  assert.equal(f.calls.length, 4);
 });

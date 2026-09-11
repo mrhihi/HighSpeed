@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { fetchDailySeatData } from "../dailySeatData";
+import { tdxGet } from "../tdxClient";
+import { getOrFetchCached } from "../cache";
 import type {
+  AvailableSeat,
+  AvailableSeatStatusWrapper,
   DaySeatResult,
+  RailODDailyTimetable,
   SeatSearchRequestBody,
 } from "../types";
 
@@ -9,6 +13,74 @@ const router = Router();
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_DATES_PER_REQUEST = 60;
+function cacheTtlEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+const SEAT_CACHE_TTL_MS = cacheTtlEnv("TDX_SEAT_CACHE_TTL_MS", 60 * 1000);
+const TIMETABLE_CACHE_TTL_MS = cacheTtlEnv("TDX_TIMETABLE_CACHE_TTL_MS", 24 * 60 * 60 * 1000);
+
+/** Fetches the timetable for one OD and indexes it by train number. */
+async function fetchTrainTimesByTrainNo(
+  origin: string,
+  destination: string,
+  date: string,
+  dependencies: { getOrFetchCached: typeof getOrFetchCached; tdxGet: typeof tdxGet },
+): Promise<Map<string, { departureTime?: string; arrivalTime?: string }>> {
+  const result = await dependencies.getOrFetchCached(
+    "timetable",
+    `${origin}:${destination}:${date}`,
+    TIMETABLE_CACHE_TTL_MS,
+    () => dependencies.tdxGet<RailODDailyTimetable[]>(
+      `/v2/Rail/THSR/DailyTimetable/OD/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}/${encodeURIComponent(date)}`,
+    ),
+  );
+  return new Map(result.value.map((entry) => [entry.DailyTrainInfo.TrainNo, {
+    departureTime: entry.OriginStopTime?.DepartureTime,
+    arrivalTime: entry.DestinationStopTime?.ArrivalTime,
+  }]));
+}
+
+export async function fetchSeatSegment(
+  origin: string,
+  destination: string,
+  date: string,
+  forceRefresh = false,
+  dependencies = { getOrFetchCached, tdxGet },
+): Promise<{
+  seats: AvailableSeat[];
+  fromCache: boolean;
+  stale: boolean;
+  cachedAt: number;
+}> {
+  const seatData = await dependencies.getOrFetchCached(
+    "seats",
+    `${origin}:${destination}:${date}`,
+    SEAT_CACHE_TTL_MS,
+    () => dependencies.tdxGet<AvailableSeatStatusWrapper>(
+      `/v2/Rail/THSR/AvailableSeatStatus/Train/OD/${encodeURIComponent(origin)}/to/${encodeURIComponent(destination)}/TrainDate/${encodeURIComponent(date)}`,
+    ),
+    forceRefresh,
+  );
+  const seats: AvailableSeat[] = [...(seatData.value.AvailableSeats ?? [])];
+
+  try {
+    const timesByTrainNo = await fetchTrainTimesByTrainNo(origin, destination, date, dependencies);
+    for (const seat of seats) {
+      const times = timesByTrainNo.get(seat.TrainNo);
+      if (times) {
+        seat.DepartureTime = times.departureTime;
+        seat.ArrivalTime = times.arrivalTime;
+      }
+    }
+  } catch {
+    // Seat availability remains useful when timetable enrichment fails.
+  }
+
+  return { seats, fromCache: seatData.fromCache, stale: seatData.stale, cachedAt: seatData.cachedAt };
+}
+
 router.post("/", async (req, res) => {
   const body = req.body as Partial<SeatSearchRequestBody>;
   const { originStationId, destinationStationId, dates, forceRefresh = false } = body;
@@ -40,8 +112,8 @@ router.post("/", async (req, res) => {
   const results: DaySeatResult[] = await Promise.all(
     uniqueDates.map(async (date): Promise<DaySeatResult> => {
       try {
-        const seatData = await fetchDailySeatData(date, forceRefresh);
-        const { seats } = seatData.getSegment(originStationId, destinationStationId);
+        const seatData = await fetchSeatSegment(originStationId, destinationStationId, date, forceRefresh);
+        const { seats } = seatData;
 
         seats.sort((a, b) => (a.DepartureTime ?? "").localeCompare(b.DepartureTime ?? ""));
 

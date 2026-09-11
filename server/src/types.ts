@@ -40,6 +40,16 @@ export interface RailStopTime {
   DepartureTime: string;
 }
 
+export interface RailODDailyTimetable {
+  TrainDate: string;
+  DailyTrainInfo: {
+    TrainNo: string;
+    Direction: number;
+  };
+  OriginStopTime?: RailStopTime;
+  DestinationStopTime?: RailStopTime;
+}
+
 export interface RailDailyTimetable {
   TrainDate: string;
   DailyTrainInfo: {

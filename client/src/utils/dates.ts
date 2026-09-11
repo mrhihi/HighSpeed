@@ -1,3 +1,5 @@
+import type { TripLeg } from "../types";
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Formats a Date as yyyy-MM-dd in local time. */
@@ -10,6 +12,18 @@ export function toDateString(date: Date): string {
 
 export function todayString(): string {
   return toDateString(new Date());
+}
+
+/** Returns whether a yyyy-MM-dd value is earlier than today in local time. */
+export function isPastDate(value: string, today: string = todayString()): boolean {
+  return Boolean(value) && value < today;
+}
+
+/** Replaces every leg's date selection with one local date without mutating the input. */
+export function replaceTripLegDates(legs: TripLeg[], date: string = todayString()): TripLeg[] {
+  return legs.map((leg) => leg.dateMode === "multi"
+    ? { ...leg, multiDates: [date] }
+    : { ...leg, rangeStart: date, rangeEnd: date });
 }
 
 /** Validates a 24-hour clock value in HH:mm format. */
