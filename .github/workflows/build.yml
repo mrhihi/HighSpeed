@@ -54,6 +54,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
+      - name: Show GitHub Actions runner IP
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "GitHub Actions runner public IPv4:"
+          curl -4 -fsS --connect-timeout 10 --max-time 15 https://api.ipify.org
+          echo
+
       - name: Trust deployment host
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
