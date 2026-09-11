@@ -49,20 +49,20 @@ jobs:
         working-directory: server
 
       - name: Set up SSH
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
       - name: Show GitHub Actions runner IP
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         run: |
           echo "GitHub Actions runner public IPv4:"
           curl -4 -fsS --connect-timeout 10 --max-time 15 https://api.ipify.org
           echo
 
       - name: Trust deployment host
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -70,7 +70,7 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
 
       - name: Prepare remote directories
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         run: |
           timeout 30s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
@@ -78,7 +78,7 @@ jobs:
             'mkdir -p /home/ubuntu/Workspace/highspeed/server/dist /home/ubuntu/Workspace/highspeed/client/dist'
 
       - name: Deploy client
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         run: |
           tar -C client/dist -czf - . | \
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
@@ -87,7 +87,7 @@ jobs:
               'tmp=$(mktemp -d /tmp/highspeed-client.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/client/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/client/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/client/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/client/dist'
 
       - name: Deploy server
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         run: |
           tar -C server/dist -czf - . | \
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
@@ -96,7 +96,7 @@ jobs:
               'tmp=$(mktemp -d /tmp/highspeed-server.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/server/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/server/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/server/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/server/dist'
 
       - name: Restart server and verify health
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip deploy]')
         run: |
           timeout 120s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \

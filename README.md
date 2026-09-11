@@ -356,6 +356,22 @@ sudo cat /etc/ssh/ssh_host_ed25519_key.pub
 
 將 `cat` 的完整單行輸出貼到 `DEPLOY_HOST_KEY`；貼上前請先用前一個指令確認 host key 指紋。不要貼指紋本身。
 
+這裡使用的是兩組不同的非對稱金鑰：
+
+| 金鑰 | 私鑰位置 | 公鑰位置 | 用途 |
+| --- | --- | --- | --- |
+| GitHub Actions 登入金鑰 | GitHub Secret `DEPLOY_SSH_KEY` | 伺服器 `~/.ssh/authorized_keys` | 證明 Actions 有權登入伺服器 |
+| 伺服器 host key | 伺服器 `/etc/ssh/ssh_host_ed25519_key` | GitHub Secret `DEPLOY_HOST_KEY` | 證明連線的伺服器是正確的主機 |
+
+部署時的驗證順序如下：
+
+1. Actions 將 `DEPLOY_HOST_KEY` 寫入 Runner 暫存環境的 `~/.ssh/known_hosts`。
+2. SSH 比對伺服器提供的 host key，確認不是錯誤主機或中間人。
+3. SSH 使用 `DEPLOY_SSH_KEY` 登入 `ubuntu`。
+4. 登入成功後，Actions 才執行部署命令。
+
+伺服器 host key 的私鑰只能留在伺服器，不能放到 GitHub；GitHub Secret `DEPLOY_SSH_KEY` 也只能放登入用私鑰，不能和 host key 私鑰混用。
+
 伺服器上的 `.env`、PM2 設定與反向代理設定需先自行配置；Actions 只更新 `dist` 目錄，不會覆蓋這些執行環境設定。若 `.env` 放在 `server/dist/.env`，部署交換目錄時也會保留既有檔案。
 
 前端指令：
