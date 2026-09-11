@@ -1476,6 +1476,41 @@
   justify-content: center;
 }
 
+/* Keep the pure-query conditions aligned to the same left and right edges. */
+.search-workspace .station-select,
+.search-workspace .date-range-fields,
+.search-workspace .time-range-fields {
+  width: 100%;
+}
+
+.search-workspace .station-select {
+  flex-wrap: nowrap;
+  justify-content: stretch;
+}
+
+.search-workspace .station-select .field,
+.search-workspace .date-range-fields .field,
+.search-workspace .time-range-fields .time-filter-field {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.search-workspace .station-select select,
+.search-workspace .date-range-fields input[type="date"],
+.search-workspace .time-range-fields .time-input,
+.search-workspace .time-range-fields .time-input-control input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.search-workspace .date-range-fields,
+.search-workspace .time-range-fields {
+  flex-wrap: nowrap;
+  justify-content: stretch;
+}
+
 .trip-leg-header {
   display: flex;
   align-items: center;
