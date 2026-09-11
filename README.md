@@ -318,6 +318,34 @@ npm run build
 
 前端靜態檔案會輸出到 `client/dist`，可部署至靜態網站主機。正式環境需要將前端的 `/api` 反向代理到後端，例如後端服務所在的 `http://localhost:4000`；同時必須在後端主機設定 TDX 金鑰與環境變數。
 
+### GitHub Actions 自動部署
+
+`.github/workflows/build.yml` 會在所有 Push 與 Pull Request 執行建置；只有 Push 到 `main` 且建置成功時，才會透過 SSH 部署到 `mrhihi-freevm.ddns.net`：
+
+- 前端：`/home/ubuntu/Workspace/highspeed/client/dist`
+- 後端：`/home/ubuntu/Workspace/highspeed/server/dist`
+- 部署後執行 `pm2 restart highspeed-server --update-env`，並檢查 `/api/health`
+
+首次設定時，在本機建立專用 SSH 金鑰（不要設定 passphrase，讓 Actions 可非互動使用）：
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-highspeed" -f ~/.ssh/highspeed_actions
+```
+
+將公開金鑰加入伺服器的 `authorized_keys`：
+
+```bash
+cat ~/.ssh/highspeed_actions.pub | ssh ubuntu@mrhihi-freevm.ddns.net \
+  'umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys'
+```
+
+接著到 GitHub repository 的 **Settings → Secrets and variables → Actions → New repository secret**，建立：
+
+- Name：`DEPLOY_SSH_KEY`
+- Secret：貼上 `~/.ssh/highspeed_actions` 的完整內容（私密金鑰，不是 `.pub` 檔）
+
+伺服器上的 `.env`、PM2 設定與反向代理設定需先自行配置；Actions 只更新 `dist` 目錄，不會覆蓋這些執行環境設定。
+
 前端指令：
 
 ```bash

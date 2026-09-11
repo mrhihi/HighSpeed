@@ -247,6 +247,23 @@ function App() {
               <p>查看 TDX 原始對號座狀態，不自動組合購票方案。</p>
             </div>
           </div>
+          <aside className="data-freshness-note" aria-label="TDX API 資料更新說明">
+            <div className="data-freshness-icon" aria-hidden="true">↻</div>
+            <div>
+              <strong>API 資料更新可能有時間差</strong>
+              <p>
+                TDX 資料服務頁列出本查詢使用的高鐵資料 API；API 回傳的是 TDX 最近一次提供的資料，並不代表官方訂票系統的即時票況。
+                因此查詢結果可能有同步時間差，實際購票請以官方訂票系統為準。本網站另會使用 60 秒本地快取；需要重新抓取時可勾選「跳過 60 秒快取」。
+              </p>
+              <a
+                href="https://tdx.transportdata.tw/data-service/basic?keyword=%E9%AB%98%E9%90%B5"
+                target="_blank"
+                rel="noreferrer"
+              >
+                查看 TDX 高鐵資料服務 ↗
+              </a>
+            </div>
+          </aside>
           <div className="search-form">
           {legs.map((leg, index) => (
             <TripLegForm
