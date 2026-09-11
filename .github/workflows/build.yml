@@ -76,7 +76,7 @@ jobs:
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
               "$DEPLOY_USER@$DEPLOY_HOST" \
-              'tmp=$(mktemp -d /tmp/highspeed-client.XXXXXX) && tar -C "$tmp" -xzf - && rm -rf /home/ubuntu/Workspace/highspeed/client/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/client/dist'
+              'tmp=$(mktemp -d /tmp/highspeed-client.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/client/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/client/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/client/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/client/dist'
 
       - name: Deploy server
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -85,7 +85,7 @@ jobs:
             timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
               -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
               "$DEPLOY_USER@$DEPLOY_HOST" \
-              'tmp=$(mktemp -d /tmp/highspeed-server.XXXXXX) && tar -C "$tmp" -xzf - && rm -rf /home/ubuntu/Workspace/highspeed/server/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/server/dist'
+              'tmp=$(mktemp -d /tmp/highspeed-server.XXXXXX) && tar -C "$tmp" -xzf - && if [ -f /home/ubuntu/Workspace/highspeed/server/dist/.env ]; then cp -p /home/ubuntu/Workspace/highspeed/server/dist/.env "$tmp/.env"; fi && rm -rf /home/ubuntu/Workspace/highspeed/server/dist && mv "$tmp" /home/ubuntu/Workspace/highspeed/server/dist'
 
       - name: Restart server and verify health
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

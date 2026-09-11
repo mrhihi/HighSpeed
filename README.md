@@ -344,7 +344,7 @@ cat ~/.ssh/highspeed_actions.pub | ssh ubuntu@mrhihi-freevm.ddns.net \
 - Name：`DEPLOY_SSH_KEY`
 - Secret：貼上 `~/.ssh/highspeed_actions` 的完整內容（私密金鑰，不是 `.pub` 檔）
 
-伺服器上的 `.env`、PM2 設定與反向代理設定需先自行配置；Actions 只更新 `dist` 目錄，不會覆蓋這些執行環境設定。
+伺服器上的 `.env`、PM2 設定與反向代理設定需先自行配置；Actions 只更新 `dist` 目錄，不會覆蓋這些執行環境設定。若 `.env` 放在 `server/dist/.env`，部署交換目錄時也會保留既有檔案。
 
 前端指令：
 
