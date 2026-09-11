@@ -22,7 +22,7 @@ pnpm-debug.log*
 *.pid.lock
 
 # Local caches
-server/data/cache/
+server/data/
 *.tsbuildinfo
 
 # Editor and OS files
@@ -32,4 +32,3 @@ server/data/cache/
 !.vscode/extensions.json
 *.swp
 *.swo
-

@@ -15,6 +15,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: mrhihi-freevm.ddns.net
+      DEPLOY_USER: ubuntu
 
     steps:
       - name: Checkout
@@ -56,28 +59,34 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          ssh-keyscan -H mrhihi-freevm.ddns.net >> ~/.ssh/known_hosts
+          timeout 20s ssh-keyscan -4 -T 10 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
       - name: Prepare remote directories
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          ssh ubuntu@mrhihi-freevm.ddns.net \
+          timeout 30s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
+            -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
             'mkdir -p /home/ubuntu/Workspace/highspeed/server/dist /home/ubuntu/Workspace/highspeed/client/dist'
 
       - name: Deploy client
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          rsync -az --delete client/dist/ \
-            ubuntu@mrhihi-freevm.ddns.net:/home/ubuntu/Workspace/highspeed/client/dist/
+          rsync -az --delete \
+            -e 'ssh -4 -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2' \
+            client/dist/ "$DEPLOY_USER@$DEPLOY_HOST:/home/ubuntu/Workspace/highspeed/client/dist/"
 
       - name: Deploy server
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          rsync -az --delete server/dist/ \
-            ubuntu@mrhihi-freevm.ddns.net:/home/ubuntu/Workspace/highspeed/server/dist/
+          rsync -az --delete \
+            -e 'ssh -4 -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=2' \
+            server/dist/ "$DEPLOY_USER@$DEPLOY_HOST:/home/ubuntu/Workspace/highspeed/server/dist/"
 
       - name: Restart server and verify health
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          ssh ubuntu@mrhihi-freevm.ddns.net \
-            'pm2 restart highspeed-server --update-env && curl --fail --silent --show-error http://127.0.0.1:4000/api/health'
+          timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
+            -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            'pm2 restart highspeed-server --update-env && curl --fail --silent --show-error --max-time 15 http://127.0.0.1:4000/api/health'
