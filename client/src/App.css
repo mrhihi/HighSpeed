@@ -342,7 +342,7 @@
   position: relative;
 }
 
-.saved-condition-menu > summary {
+.saved-condition-menu > .saved-condition-menu-trigger {
   display: inline-flex;
   align-items: center;
   list-style: none;
@@ -376,7 +376,7 @@
   transition: transform 100ms ease;
 }
 
-.saved-condition-menu[open] > .saved-condition-menu-trigger::after {
+.saved-condition-menu[data-open="true"] > .saved-condition-menu-trigger::after {
   top: 13px;
   transform: rotate(225deg);
 }
@@ -395,12 +395,8 @@
   outline-offset: 2px;
 }
 
-.saved-condition-menu > summary {
+.saved-condition-menu > .saved-condition-menu-trigger {
   box-sizing: border-box;
-}
-
-.saved-condition-menu > summary::-webkit-details-marker {
-  display: none;
 }
 
 .saved-condition-menu-popup {
@@ -429,9 +425,7 @@
   content: "";
 }
 
-.saved-condition-menu[open] > .saved-condition-menu-popup,
-.saved-condition-menu:hover > .saved-condition-menu-popup,
-.saved-condition-menu:focus-within > .saved-condition-menu-popup {
+.saved-condition-menu[data-open="true"] > .saved-condition-menu-popup {
   display: flex;
 }
 

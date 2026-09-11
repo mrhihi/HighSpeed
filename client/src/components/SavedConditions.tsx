@@ -47,11 +47,6 @@ export function SavedConditions<T>({ storageKey, value, onLoad, onLoadWithToday,
     action();
   };
 
-  const closeOtherMenus = (event: { currentTarget: HTMLElement }) => {
-    const menu = event.currentTarget.dataset.menu as "conditions" | "clipboard" | undefined;
-    if (menu) setOpenMenu(menu);
-  };
-
   const openMenuOnHover = (event: { currentTarget: HTMLElement }) => {
     const menu = event.currentTarget.dataset.menu as "conditions" | "clipboard" | undefined;
     if (menu) {
@@ -62,8 +57,7 @@ export function SavedConditions<T>({ storageKey, value, onLoad, onLoadWithToday,
 
   const openMenuOnClick = (event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
-    const menu = event.currentTarget.closest("details");
-    const menuId = menu?.dataset.menu as "conditions" | "clipboard" | undefined;
+    const menuId = event.currentTarget.dataset.menu as "conditions" | "clipboard" | undefined;
     if (menuId) {
       setHoveredMenu(null);
       setOpenMenu((current) => current === menuId ? null : menuId);
@@ -133,10 +127,8 @@ export function SavedConditions<T>({ storageKey, value, onLoad, onLoadWithToday,
     showFeedback("重新命名完成");
   };
 
-  const copySelected = async () => {
-    const item = items.find((candidate) => candidate.id === selectedId);
-    if (!item) return;
-    const content = JSON.stringify({ name: item.name, value: item.value }, null, 2);
+  const copyCurrent = async () => {
+    const content = JSON.stringify({ name: `${label}目前畫面`, value }, null, 2);
     try {
       await navigator.clipboard.writeText(content);
     } catch {
@@ -200,22 +192,22 @@ export function SavedConditions<T>({ storageKey, value, onLoad, onLoadWithToday,
           <option value="">請選擇</option>
           {items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
-        <details open={openMenu === "conditions" || hoveredMenu === "conditions"} data-menu="conditions" className="saved-condition-menu" onMouseEnter={openMenuOnHover} onMouseLeave={closeMenuOnLeave} onFocusCapture={closeOtherMenus}>
-          <summary className="saved-condition-menu-trigger" onClick={openMenuOnClick} aria-haspopup="menu" aria-expanded={openMenu === "conditions" || hoveredMenu === "conditions"}>條件操作</summary>
+        <div data-menu="conditions" data-open={openMenu === "conditions" || hoveredMenu === "conditions"} className="saved-condition-menu" onMouseEnter={openMenuOnHover} onMouseLeave={closeMenuOnLeave}>
+          <button type="button" data-menu="conditions" className="saved-condition-menu-trigger" onClick={openMenuOnClick} aria-haspopup="menu" aria-expanded={openMenu === "conditions" || hoveredMenu === "conditions"}>條件操作</button>
           <div className="saved-condition-menu-popup">
             <button type="button" className="saved-condition-menu-item" onClick={closeMenuAnd(() => updateCurrent())} disabled={!selectedId}>更新</button>
             <button type="button" className="saved-condition-menu-item" onClick={closeMenuAnd(() => saveAsNew())}>另存</button>
             <button type="button" className="saved-condition-menu-item" onClick={closeMenuAnd(() => renameSelected())} disabled={!selectedId}>重新命名</button>
             <button type="button" className="saved-condition-menu-item saved-condition-menu-item-danger" onClick={closeMenuAnd(() => deleteSelected())} disabled={!selectedId}>刪除</button>
           </div>
-        </details>
-        <details open={openMenu === "clipboard" || hoveredMenu === "clipboard"} data-menu="clipboard" className="saved-condition-menu" onMouseEnter={openMenuOnHover} onMouseLeave={closeMenuOnLeave} onFocusCapture={closeOtherMenus}>
-          <summary className="saved-condition-menu-trigger" onClick={openMenuOnClick} aria-haspopup="menu" aria-expanded={openMenu === "clipboard" || hoveredMenu === "clipboard"}>剪貼簿</summary>
+        </div>
+        <div data-menu="clipboard" data-open={openMenu === "clipboard" || hoveredMenu === "clipboard"} className="saved-condition-menu" onMouseEnter={openMenuOnHover} onMouseLeave={closeMenuOnLeave}>
+          <button type="button" data-menu="clipboard" className="saved-condition-menu-trigger" onClick={openMenuOnClick} aria-haspopup="menu" aria-expanded={openMenu === "clipboard" || hoveredMenu === "clipboard"}>剪貼簿</button>
           <div className="saved-condition-menu-popup">
-            <button type="button" className="saved-condition-menu-item" onClick={closeMenuAnd(() => copySelected())} disabled={!selectedId}>複製到剪貼簿</button>
+            <button type="button" className="saved-condition-menu-item" onClick={closeMenuAnd(() => copyCurrent())}>複製目前條件到剪貼簿</button>
             <button type="button" className="saved-condition-menu-item" onClick={closeMenuAnd(() => pasteCondition())}>從剪貼簿貼上</button>
           </div>
-        </details>
+        </div>
         {onLoadWithToday && <button type="button" className="saved-condition-button" onClick={loadWithToday} disabled={!selectedId}>帶入並改為今天</button>}
         {copyMessage && <span className="saved-condition-feedback" role="status">{copyMessage}</span>}
       </div>
