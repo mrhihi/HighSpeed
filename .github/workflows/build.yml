@@ -93,4 +93,4 @@ jobs:
           timeout 45s ssh -4 -o BatchMode=yes -o ConnectTimeout=15 \
             -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            'bash -lc '\''if [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; nvm use default >/dev/null; fi; command -v node; pm2 restart highspeed-server --update-env && curl --fail --silent --show-error --max-time 15 http://127.0.0.1:4000/api/health'\'''
+            'bash -lc '\''if [ -s "$HOME/.nvm/nvm.sh" ]; then . "$HOME/.nvm/nvm.sh"; nvm use default >/dev/null; fi; command -v node; pm2 restart highspeed-server --update-env; for attempt in {1..30}; do if curl --fail --silent --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:4000/api/health; then exit 0; fi; sleep 1; done; echo "Health check failed after 30 attempts"; pm2 status; pm2 logs highspeed-server --lines 50 --nostream; exit 1'\'''
