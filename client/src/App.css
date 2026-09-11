@@ -1916,6 +1916,41 @@
   margin: 0 0 12px;
 }
 
+.seat-status-note {
+  flex-basis: 100%;
+  color: #8a5a16;
+}
+
+.thsr-booking-link,
+.thsr-app-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid #c9d7e5;
+  border-radius: 999px;
+  color: #145da0;
+  background: #f5f9fd;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.thsr-booking-link:hover,
+.thsr-app-link:hover {
+  background: #e8f2fb;
+  text-decoration: underline;
+}
+
+.thsr-app-link {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .thsr-app-link {
+    display: inline-flex;
+  }
+}
+
 /* Keep all five booking-focused columns visible inside a two-column result card. */
 @container (max-width: 700px) {
   .seat-table-wrapper {

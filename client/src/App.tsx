@@ -171,9 +171,12 @@ function App() {
           const maxThreshold = leg.maxTime ? `${leg.maxTime}:00` : null;
           const results = response.results.map((day) => ({
             ...day,
-            // 找不到發車時間的車次（時刻表合併失敗）仍予保留，避免誤過濾掉有效資料
+            // 沒有時間條件時保留未成功合併時刻表的車次；有時間條件時必須排除，
+            // 否則無法確認是否落在區間內，可能誤顯示早於最早出發時間的車次。
             seats: day.seats.filter((seat) => {
-              if (!seat.DepartureTime) return true;
+              // 有時間條件時，沒有成功合併時刻表的車次無法確認是否在區間內；
+              // 若保留它，會讓早於最早出發時間的車次誤出現在結果中。
+              if (!seat.DepartureTime) return !minThreshold && !maxThreshold;
               if (minThreshold && seat.DepartureTime < minThreshold) return false;
               if (maxThreshold && seat.DepartureTime > maxThreshold) return false;
               return true;

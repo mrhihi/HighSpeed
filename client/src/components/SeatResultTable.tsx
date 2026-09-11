@@ -2,6 +2,15 @@ import type { AvailableSeat, DaySeatResult, LegSearchResult } from "../types";
 import { useState } from "react";
 import { seatStatusClass, seatStatusLabel } from "../utils/seatStatus";
 
+const THSR_BOOKING_URL = "https://irs.thsrc.com.tw/IMINT";
+const THSR_IOS_APP_URL = "https://apps.apple.com/tw/app/id468963664";
+const THSR_ANDROID_APP_URL = "https://play.google.com/store/apps/details?id=tw.com.thsrc.texpress";
+
+function thsrAppUrl(): string {
+  if (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)) return THSR_ANDROID_APP_URL;
+  return THSR_IOS_APP_URL;
+}
+
 function directionLabel(direction: number): string {
   if (direction === 0) return "南下";
   if (direction === 1) return "北上";
@@ -184,6 +193,9 @@ function SeatStatusLegend() {
       <span className="seat-status available">尚有座位</span>
       <span className="seat-status limited">座位有限</span>
       <span className="seat-status full">已無座位</span>
+      <span className="seat-status-note">「座位有限」仍可能在官網訂不到票，請以高鐵官方票況為準。</span>
+      <a className="thsr-booking-link" href={THSR_BOOKING_URL} target="_blank" rel="noreferrer">前往高鐵官方購票</a>
+      <a className="thsr-app-link" href={thsrAppUrl()} target="_blank" rel="noreferrer">開啟／下載 T-EX App</a>
     </p>
   );
 }
