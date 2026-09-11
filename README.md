@@ -326,6 +326,8 @@ npm run build
 - 後端：`/home/ubuntu/Workspace/highspeed/server/dist`
 - 部署後執行 `pm2 restart highspeed-server --update-env`，並檢查 `/api/health`
 
+若要 push 到 `main` 但跳過正式部署，只要在 commit message 任意位置加入 `[skip deploy]`。該次仍會執行建置，但會跳過所有 SSH 部署步驟；沒有這個標記時，push 到 `main` 會正常部署。
+
 首次設定時，在本機建立專用 SSH 金鑰（不要設定 passphrase，讓 Actions 可非互動使用）：
 
 ```bash
