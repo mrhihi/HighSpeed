@@ -346,15 +346,15 @@ cat ~/.ssh/highspeed_actions.pub | ssh ubuntu@mrhihi-freevm.ddns.net \
 
 另外建立伺服器 host key Secret，避免部署時執行 `ssh-keyscan` 產生多個登入前連線而觸發 fail2ban：
 
-- Name：`DEPLOY_KNOWN_HOSTS`
+- Name：`DEPLOY_HOST_KEY`
 - Secret：在伺服器上執行以下指令，貼上完整輸出內容：
 
 ```bash
 sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256
-ssh-keyscan -4 -t ed25519 -H mrhihi-freevm.ddns.net
+sudo cat /etc/ssh/ssh_host_ed25519_key.pub
 ```
 
-將 `ssh-keyscan` 的完整單行輸出貼到 `DEPLOY_KNOWN_HOSTS`；貼上前請先用前一個指令確認 host key 指紋。
+將 `cat` 的完整單行輸出貼到 `DEPLOY_HOST_KEY`；貼上前請先用前一個指令確認 host key 指紋。不要貼指紋本身。
 
 伺服器上的 `.env`、PM2 設定與反向代理設定需先自行配置；Actions 只更新 `dist` 目錄，不會覆蓋這些執行環境設定。若 `.env` 放在 `server/dist/.env`，部署交換目錄時也會保留既有檔案。
 
