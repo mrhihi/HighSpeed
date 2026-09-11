@@ -5,6 +5,7 @@ import type { PlannerDayResult, SeatPlan, Station } from "../types";
 import { LoadingErrorState } from "./LoadingErrorState";
 import { TimeInput } from "./TimeInput";
 import { SavedConditions } from "./SavedConditions";
+import { DataFreshnessNote } from "./DataFreshnessNote";
 import type { UsageStats } from "../api/client";
 
 interface PlannerCondition {
@@ -199,6 +200,7 @@ export function PurchasePlanner({ stations, stationsLoading, stationsError, onUs
 
   return (
     <section className="planner-workspace" role="tabpanel" aria-label="購票建議">
+      <DataFreshnessNote />
       <SavedConditions<PlannerCondition>
         storageKey="highspeed.saved.planner-conditions"
         label="購票建議"
