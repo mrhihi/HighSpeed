@@ -5,7 +5,7 @@
 help:
 	@printf '%s\n' \
 		'可用指令：' \
-		'  make build  安裝依賴並建置前後端' \
+		'  make build  安裝依賴並建置前端及後端 bundle' \
 		'  make clean  清除編譯結果及過程檔' \
 		'  make run    啟動前後端開發伺服器' \
 		'  make help   顯示此說明'

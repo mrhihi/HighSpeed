@@ -1,5 +1,7 @@
 import type { SeatPlanResponse, SeatSearchResponse, Station } from "../types";
 
+const API_BASE = `${import.meta.env.BASE_URL}api`;
+
 export interface UsageStats {
   views: number;
   queries: number;
@@ -7,12 +9,12 @@ export interface UsageStats {
 }
 
 export async function fetchUsageStats(): Promise<UsageStats> {
-  const response = await fetch("/api/usage");
+  const response = await fetch(`${API_BASE}/usage`);
   return parseJsonOrThrow<UsageStats>(response);
 }
 
 export async function recordUsageEvent(event: "view" | "query" | "recommendation"): Promise<UsageStats> {
-  const response = await fetch("/api/usage/events", {
+  const response = await fetch(`${API_BASE}/usage/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ event }),
@@ -31,7 +33,7 @@ async function parseJsonOrThrow<T>(response: Response): Promise<T> {
 }
 
 export async function fetchStations(): Promise<Station[]> {
-  const response = await fetch("/api/stations");
+  const response = await fetch(`${API_BASE}/stations`);
   return parseJsonOrThrow<Station[]>(response);
 }
 
@@ -41,7 +43,7 @@ export async function fetchSeatAvailability(
   dates: string[],
   forceRefresh = false,
 ): Promise<SeatSearchResponse> {
-  const response = await fetch("/api/seats", {
+  const response = await fetch(`${API_BASE}/seats`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ originStationId, destinationStationId, dates, forceRefresh }),
@@ -61,7 +63,7 @@ export async function fetchSeatPlans(
   selectedSeatModes: Array<"reserved-standard" | "reserved-business" | "free">,
   forceRefresh = false,
 ): Promise<SeatPlanResponse> {
-  const response = await fetch("/api/seat-plans", {
+  const response = await fetch(`${API_BASE}/seat-plans`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

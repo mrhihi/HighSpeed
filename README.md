@@ -302,9 +302,12 @@ Request：
 
 ```bash
 cd server
+npm ci
 npm run build
 npm start
 ```
+
+後端正式版會由 esbuild 打包成 `server/dist/index.js`，包含 Express、CORS、dotenv 等執行期 JavaScript 依賴；production 不需要再安裝 `node_modules`。發布時可只部署 `dist/index.js`（`index.js.map` 僅供除錯，可省略），並另外提供可寫入的 `data/` 目錄及 TDX 環境變數。若要在 production 使用 `npm start`，則需一併保留 `package.json`；也可以直接執行 `node dist/index.js`。
 
 建置前端：
 

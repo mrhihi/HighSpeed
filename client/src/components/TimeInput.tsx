@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 interface TimeInputProps {
   value: string;
@@ -23,6 +23,7 @@ function splitTime(value: string): { hour: string; minute: string } {
 export function TimeInput({ value, onChange, disabled, placeholder = "HH:mm", ariaLabel }: TimeInputProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const dialogInputRef = useRef<HTMLInputElement>(null);
   const hoursScrollRef = useRef<HTMLDivElement>(null);
   const minutesScrollRef = useRef<HTMLDivElement>(null);
   const { hour, minute } = splitTime(value);
@@ -38,6 +39,11 @@ export function TimeInput({ value, onChange, disabled, placeholder = "HH:mm", ar
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
+  useLayoutEffect(() => {
+    if (!open || disabled) return;
+    dialogInputRef.current?.focus();
+  }, [open, disabled]);
+
   const chooseHour = (nextHour: string) => {
     onChange(`${nextHour}:${minute || "00"}`);
   };
@@ -49,61 +55,84 @@ export function TimeInput({ value, onChange, disabled, placeholder = "HH:mm", ar
 
   return (
     <div className="time-input" ref={wrapperRef}>
-      <div className="time-input-control">
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={5}
-          value={value}
-          disabled={disabled}
-          placeholder={placeholder}
-          aria-label={ariaLabel}
-          onFocus={() => setOpen(true)}
-          onChange={(event) => onChange(normalizeTimeInput(event.target.value))}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") setOpen(false);
-            if (event.key === "ArrowDown") {
-              event.preventDefault();
-              setOpen(true);
-            }
-          }}
-        />
-        <button type="button" className="time-picker-button" onClick={() => setOpen((current) => !current)} disabled={disabled} aria-label={`${ariaLabel}開啟選擇器`} aria-expanded={open}>
-          ▾
-        </button>
-      </div>
+      {!open && (
+        <div className="time-input-control">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={5}
+            value={value}
+            disabled={disabled}
+            placeholder={placeholder}
+            aria-label={ariaLabel}
+            onFocus={() => setOpen(true)}
+            onChange={(event) => onChange(normalizeTimeInput(event.target.value))}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setOpen(false);
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setOpen(true);
+              }
+            }}
+          />
+          <button type="button" className="time-picker-button" onClick={() => setOpen(true)} disabled={disabled} aria-label={`${ariaLabel}開啟選擇器`} aria-expanded={open}>
+            ▾
+          </button>
+        </div>
+      )}
       {open && !disabled && (
-        <div className="time-picker-popover" role="dialog" aria-label={`${ariaLabel}時間選擇器`}>
-          <div className="time-picker-section">
-            <span className="time-picker-label">小時</span>
-            <div className="time-picker-scroll-row">
-              <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(hoursScrollRef, -1)} aria-label="小時往前一格">‹</button>
-              <div className="time-picker-scroll" ref={hoursScrollRef} tabIndex={0} aria-label="選擇小時，可左右滑動">
-                <div className="time-picker-options time-picker-hours">
-                  {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((option, index) => (
-                    <button type="button" key={option} className={`time-option ${index < 12 ? "before-noon" : "after-noon"} ${option === hour ? "selected" : ""}`} onClick={() => chooseHour(option)}>{option}</button>
-                  ))}
+        <div className="time-picker-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+          <div className="time-picker-popover" role="dialog" aria-modal="true" aria-label={`${ariaLabel}時間選擇器`} onMouseDown={(event) => event.stopPropagation()}>
+            <label className="time-picker-input-field">
+              <span>{ariaLabel}</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={5}
+                ref={dialogInputRef}
+                autoFocus
+                value={value}
+                disabled={disabled}
+                placeholder="HH:mm"
+                onChange={(event) => onChange(normalizeTimeInput(event.target.value))}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setOpen(false);
+                  if (event.key === "Enter") setOpen(false);
+                }}
+              />
+            </label>
+            <div className="time-picker-section">
+              <span className="time-picker-label">小時</span>
+              <div className="time-picker-scroll-row">
+                <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(hoursScrollRef, -1)} aria-label="小時往前一格">‹</button>
+                <div className="time-picker-scroll" ref={hoursScrollRef} tabIndex={0} aria-label="選擇小時，可左右滑動">
+                  <div className="time-picker-options time-picker-hours">
+                    {Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0")).map((option, index) => (
+                      <button type="button" key={option} className={`time-option ${index < 12 ? "before-noon" : "after-noon"} ${option === hour ? "selected" : ""}`} onClick={() => chooseHour(option)}>{option}</button>
+                    ))}
+                  </div>
                 </div>
+                <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(hoursScrollRef, 1)} aria-label="小時往後一格">›</button>
               </div>
-              <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(hoursScrollRef, 1)} aria-label="小時往後一格">›</button>
             </div>
-          </div>
-          <div className="time-picker-section">
-            <span className="time-picker-label">分鐘（可用鍵盤輸入 01–59）</span>
-            <div className="time-picker-scroll-row">
-              <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(minutesScrollRef, -1)} aria-label="分鐘往前一格">‹</button>
-              <div className="time-picker-scroll" ref={minutesScrollRef} tabIndex={0} aria-label="選擇分鐘，可左右滑動">
-                <div className="time-picker-options time-picker-minutes">
-                  {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((option) => (
-                    <button type="button" key={option} className={option === minute ? "time-option selected" : "time-option"} onClick={() => chooseMinute(option)}>{option}</button>
-                  ))}
+            <div className="time-picker-section">
+              <span className="time-picker-label">分鐘（可用鍵盤輸入 01–59）</span>
+              <div className="time-picker-scroll-row">
+                <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(minutesScrollRef, -1)} aria-label="分鐘往前一格">‹</button>
+                <div className="time-picker-scroll" ref={minutesScrollRef} tabIndex={0} aria-label="選擇分鐘，可左右滑動">
+                  <div className="time-picker-options time-picker-minutes">
+                    {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0")).map((option) => (
+                      <button type="button" key={option} className={option === minute ? "time-option selected" : "time-option"} onClick={() => chooseMinute(option)}>{option}</button>
+                    ))}
+                  </div>
                 </div>
+                <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(minutesScrollRef, 1)} aria-label="分鐘往後一格">›</button>
               </div>
-              <button type="button" className="time-picker-nav" onClick={() => scrollOneStep(minutesScrollRef, 1)} aria-label="分鐘往後一格">›</button>
             </div>
+            <button type="button" className="time-picker-clear" onClick={() => { onChange(""); setOpen(false); }}>清除時間</button>
           </div>
-          <button type="button" className="time-picker-clear" onClick={() => { onChange(""); setOpen(false); }}>清除時間</button>
         </div>
       )}
     </div>

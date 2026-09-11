@@ -101,7 +101,7 @@ function App() {
     const listenForMetrics = async () => {
       while (!cancelled) {
         try {
-          const response = await fetch(`/api/metrics/tdx/stream?since=${version}`, { signal: controller.signal });
+          const response = await fetch(`${import.meta.env.BASE_URL}api/metrics/tdx/stream?since=${version}`, { signal: controller.signal });
           if (!response.ok) throw new Error("metrics stream unavailable");
           const metrics = await response.json() as TdxMetrics & { version: number };
           version = metrics.version;
@@ -206,7 +206,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <img className="app-logo" src="/thsr.png" alt="HighSpeed 高鐵列車圖示" />
+        <img className="app-logo" src={`${import.meta.env.BASE_URL}thsr.png`} alt="HighSpeed 高鐵列車圖示" />
         <div className="app-header-copy">
           <p className="app-kicker">HIGHSPEED · THSR</p>
           <h1>高鐵座位查詢與購票規劃</h1>
