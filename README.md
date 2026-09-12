@@ -4,6 +4,20 @@ HighSpeed 是一個以交通部 TDX（運輸資料流通服務）為資料來源
 
 本工具只提供資料查詢與購票建議，不會代為訂票、付款、鎖位或保證實際有座位。實際票況與購票結果請以高鐵官方訂票系統為準。
 
+## 線上 Demo
+
+前往 [HighSpeed Demo](https://mrhihi-freevm.ddns.net/highspeed/) 試用線上版本。
+
+## 畫面截圖
+
+### 純查詢
+
+![純查詢畫面](images/screenshot-2.png)
+
+### 購票建議
+
+![購票建議畫面](images/screenshot-1.png)
+
 ## 功能總覽
 
 ### 純查詢
