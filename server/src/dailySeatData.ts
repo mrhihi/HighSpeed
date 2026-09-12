@@ -86,6 +86,8 @@ export async function fetchDailySeatData(
     fromCache: seatData.fromCache,
     stale: seatData.stale,
     cachedAt: seatData.cachedAt,
+    tdxUpdatedAt: seatData.value.UpdateTime,
+    sourceUpdatedAt: seatData.value.SrcUpdateTime,
     getSegment(origin: string, destination: string) {
       // Copies prevent sorting or enriching one result from changing another.
       return { seats: [...(seatsByOD.get(`${origin}:${destination}`)?.values() ?? [])].map((seat) => ({ ...seat })) };

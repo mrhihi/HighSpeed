@@ -2,7 +2,7 @@
   width: min(1080px, calc(100% - 32px));
   max-width: none;
   margin: 0 auto;
-  padding: 24px 0 64px;
+  padding: 0 0 64px;
   box-sizing: border-box;
   font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
   color: #1f2933;
@@ -119,6 +119,18 @@
   margin-top: 0;
 }
 
+.app-fixed-header {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  width: min(1080px, calc(100% - 32px));
+  z-index: 20;
+  box-sizing: border-box;
+  padding-top: 24px;
+  background: var(--bg);
+  transform: translateX(-50%);
+}
+
 @media (max-width: 640px) {
   .app-header {
     align-items: flex-start;
@@ -138,6 +150,10 @@
   gap: 4px;
   border-bottom: 1px solid #d9e2ec;
   margin-bottom: 0;
+}
+
+.workspace-sticky-header {
+  position: static;
 }
 
 .workspace-tab {
@@ -185,7 +201,7 @@
 }
 
 .data-freshness-note {
-  margin: 0 0 18px;
+  margin: 0 0 10px;
   border: 1px solid #b9d9f2;
   border-radius: 10px;
   background: #f2f8fd;
@@ -950,6 +966,10 @@
   font-size: 0.8rem;
 }
 
+.plan-segment-meta .seat-status {
+  margin-right: 0;
+}
+
 .plan-transfer {
   margin: -2px 0 10px 22px;
   padding: 6px 10px;
@@ -1024,6 +1044,7 @@
   gap: 10px;
   width: 100%;
   min-width: 0;
+  padding-top: var(--app-fixed-header-space, 260px);
 }
 
 .search-form {
@@ -1639,6 +1660,17 @@
   color: #b7791f;
 }
 
+.result-freshness,
+.planner-data-freshness {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #eef1f4;
+}
+
+.planner-data-freshness {
+  margin-bottom: 0;
+}
+
 .date-range-picker {
   display: flex;
   position: relative;
@@ -2134,7 +2166,6 @@
 .thsr-app-link {
   display: none;
 }
-
 @media (max-width: 760px) {
   .thsr-app-link {
     display: inline-flex;

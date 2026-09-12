@@ -1,15 +1,7 @@
 import type { AvailableSeat, DaySeatResult, LegSearchResult } from "../types";
 import { useState } from "react";
 import { seatStatusClass, seatStatusLabel } from "../utils/seatStatus";
-
-const THSR_BOOKING_URL = "https://irs.thsrc.com.tw/IMINT";
-const THSR_IOS_APP_URL = "https://apps.apple.com/tw/app/id468963664";
-const THSR_ANDROID_APP_URL = "https://play.google.com/store/apps/details?id=tw.com.thsrc.texpress";
-
-function thsrAppUrl(): string {
-  if (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)) return THSR_ANDROID_APP_URL;
-  return THSR_IOS_APP_URL;
-}
+import { SeatStatusLegend } from "./SeatStatusLegend";
 
 function directionLabel(direction: number): string {
   if (direction === 0) return "南下";
@@ -26,6 +18,10 @@ function formatTime(time?: string): string {
   if (!time) return "—";
   // API 回傳格式為 HH:mm:ss，介面僅顯示至分鐘
   return time.slice(0, 5);
+}
+
+function formatUpdatedAt(value?: string): string {
+  return value ? new Date(value).toLocaleString("zh-TW") : "—";
 }
 
 function SeatBadge({ code, ariaLabel }: { code: string; ariaLabel: string }) {
@@ -137,12 +133,6 @@ function DayResultSection({ keyPrefix, result }: { keyPrefix: string; result: Da
         }} aria-pressed={showFilter}>
           {showFilter ? "關閉篩選" : "篩選"}
         </button>
-        {result.cachedAt && (
-          <p className={result.stale ? "cache-hint cache-hint-stale" : "cache-hint"}>
-            {result.stale ? "TDX 暫時無法更新，顯示過期快取" : result.cached ? "來自本地快取" : "剛從 TDX 更新"}
-            {` · ${new Date(result.cachedAt).toLocaleString("zh-TW")}`}
-          </p>
-        )}
       </div>
       {result.error && <p className="day-error">查詢失敗：{result.error}</p>}
       {!result.error && filteredSeats.length === 0 && (
@@ -172,6 +162,14 @@ function DayResultSection({ keyPrefix, result }: { keyPrefix: string; result: Da
           </table>
         </div>
       )}
+      {result.cachedAt && (
+        <p className={`cache-hint result-freshness ${result.stale ? "cache-hint-stale" : ""}`}>
+          {result.stale ? "TDX 暫時無法更新，顯示過期快取" : result.cached ? "來自本地快取" : "剛從 TDX 更新"}
+          {` · 本地抓取 ${formatUpdatedAt(result.cachedAt)}`}
+          {result.sourceUpdatedAt && ` · 高鐵來源 ${formatUpdatedAt(result.sourceUpdatedAt)}`}
+          {result.tdxUpdatedAt && ` · TDX ${formatUpdatedAt(result.tdxUpdatedAt)}`}
+        </p>
+      )}
     </section>
   );
 }
@@ -183,20 +181,6 @@ function DayResultGrid({ keyPrefix, results }: { keyPrefix: string; results: Day
         <DayResultSection key={`${keyPrefix}-${result.date}`} keyPrefix={keyPrefix} result={result} />
       ))}
     </div>
-  );
-}
-
-function SeatStatusLegend() {
-  return (
-    <p className="seat-status-legend">
-      座位狀態說明（高鐵僅提供等級燈號，非確切剩餘張數）：
-      <span className="seat-status available">尚有座位</span>
-      <span className="seat-status limited">座位有限</span>
-      <span className="seat-status full">已無座位</span>
-      <span className="seat-status-note">「座位有限」仍可能在官網訂不到票，請以高鐵官方票況為準。</span>
-      <a className="thsr-booking-link" href={THSR_BOOKING_URL} target="_blank" rel="noreferrer">前往高鐵官方購票</a>
-      <a className="thsr-app-link" href={thsrAppUrl()} target="_blank" rel="noreferrer">開啟／下載 T-EX App</a>
-    </p>
   );
 }
 

@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchSeatAvailability, fetchStations, fetchUsageStats, recordUsageEvent, type UsageStats } from "./api/client";
 import { PurchasePlanner } from "./components/PurchasePlanner";
-import { WorkspaceTabs } from "./components/WorkspaceTabs";
+import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { TripLegForm } from "./components/TripLegForm";
 import { SeatResultTable } from "./components/SeatResultTable";
 import { LoadingErrorState } from "./components/LoadingErrorState";
 import { SavedConditions } from "./components/SavedConditions";
-import { DataFreshnessNote } from "./components/DataFreshnessNote";
 import { expandDateRange, isPastDate, isTimeString, replaceTripLegDates, todayString } from "./utils/dates";
 import type { LegSearchResult, Station, TripLeg } from "./types";
 import "./App.css";
@@ -57,6 +56,8 @@ interface TdxMetrics {
 }
 
 function App() {
+  const appRef = useRef<HTMLDivElement>(null);
+  const fixedHeaderRef = useRef<HTMLDivElement>(null);
   const [stations, setStations] = useState<Station[]>([]);
   const [stationsError, setStationsError] = useState<string | null>(null);
   const [stationsLoading, setStationsLoading] = useState(true);
@@ -70,6 +71,21 @@ function App() {
   const [activeWorkspace, setActiveWorkspace] = useState<"search" | "planner">("search");
   const [tdxMetrics, setTdxMetrics] = useState<TdxMetrics | null>(null);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+
+  useLayoutEffect(() => {
+    const header = fixedHeaderRef.current;
+    const app = appRef.current;
+    if (!header || !app) return;
+
+    const updateHeaderSpace = () => {
+      app.style.setProperty("--app-fixed-header-space", `${header.getBoundingClientRect().height + 10}px`);
+    };
+
+    updateHeaderSpace();
+    const observer = new ResizeObserver(updateHeaderSpace);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     fetchStations()
@@ -208,23 +224,25 @@ function App() {
   };
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <img className="app-logo" src={`${import.meta.env.BASE_URL}thsr.png`} alt="HighSpeed 高鐵列車圖示" />
-        <div className="app-header-copy">
-          <p className="app-kicker">HIGHSPEED · THSR</p>
-          <h1>高鐵座位查詢與購票規劃</h1>
-          <p className="subtitle">
-            先查看即時座位狀態，再依票況選擇最適合的購票方式
-          </p>
-        </div>
-      </header>
+    <div className="app" ref={appRef}>
+      <div className="app-fixed-header" ref={fixedHeaderRef}>
+        <header className="app-header">
+          <img className="app-logo" src={`${import.meta.env.BASE_URL}thsr.png`} alt="HighSpeed 高鐵列車圖示" />
+          <div className="app-header-copy">
+            <p className="app-kicker">HIGHSPEED · THSR</p>
+            <h1>高鐵座位查詢與購票規劃</h1>
+            <p className="subtitle">
+              先查看即時座位狀態，再依票況選擇最適合的購票方式
+            </p>
+          </div>
+        </header>
+        <WorkspaceHeader active={activeWorkspace} onChange={setActiveWorkspace} />
+      </div>
 
       <main className="app-main">
         {stationsError && <p className="status-message status-error">{stationsError}</p>}
-        <WorkspaceTabs active={activeWorkspace} onChange={setActiveWorkspace} />
+        <div className="workspace-content">
         <div className="search-workspace" role="tabpanel" aria-label="純查詢" hidden={activeWorkspace !== "search"}>
-          <DataFreshnessNote />
           <SavedConditions
             storageKey="highspeed.saved.search-conditions"
             value={legs}
@@ -289,6 +307,7 @@ function App() {
         </div>
         <div hidden={activeWorkspace !== "planner"}>
           <PurchasePlanner stations={stations} stationsLoading={stationsLoading} stationsError={stationsError} onUsageStats={setUsageStats} />
+        </div>
         </div>
       </main>
       <footer className="app-footer">

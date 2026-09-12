@@ -28,6 +28,8 @@ export interface AvailableSeat {
 
 export interface AvailableSeatStatusWrapper {
   UpdateTime?: string;
+  SrcUpdateTime?: string;
+  Count?: number;
   TrainDate?: string;
   AvailableSeats: AvailableSeat[];
 }
@@ -66,6 +68,8 @@ export interface DaySeatResult {
   cached?: boolean;
   stale?: boolean;
   cachedAt?: string;
+  tdxUpdatedAt?: string;
+  sourceUpdatedAt?: string;
 }
 
 export interface SeatSearchRequestBody {

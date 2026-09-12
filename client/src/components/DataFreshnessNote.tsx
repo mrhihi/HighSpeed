@@ -48,10 +48,14 @@ export function DataFreshnessNote() {
               <td>使用 60 秒本地快取；可勾選「跳過 60 秒快取」重新抓取。</td>
             </tr>
             <tr>
+              <th scope="row">營運異常</th>
+              <td>若高鐵營運資料異常，座位狀態可能停留在最後正常資料；請以官方訂票系統或車站現場看板為準。</td>
+            </tr>
+            <tr>
               <th scope="row">官方說明</th>
               <td className="data-freshness-links">
                 <a href="https://ptx.transportdata.tw/PTX/Announcement/Details/73dddb55-9780-4416-a047-53f877f01cd3" target="_blank" rel="noreferrer">TDX 高鐵剩餘位公告 ↗</a>
-                <a href="https://motc-ptx.gitbook.io/tdx-zi-liao-shi-yong-kui-hua-bao-dian/data_notice/public_transportation_data/rail_data" target="_blank" rel="noreferrer">資料使用注意事項 ↗</a>
+                <a href="https://motc-ptx-api-documentation.gitbook.io/motc-ptx-api-documentation/api-zi-liao-shi-yong-zhu-yi-shi-xiang/rail" target="_blank" rel="noreferrer">資料使用注意事項 ↗</a>
               </td>
             </tr>
           </tbody>

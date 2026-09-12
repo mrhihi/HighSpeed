@@ -5,8 +5,9 @@ import type { PlannerDayResult, SeatPlan, Station } from "../types";
 import { LoadingErrorState } from "./LoadingErrorState";
 import { TimeInput } from "./TimeInput";
 import { SavedConditions } from "./SavedConditions";
-import { DataFreshnessNote } from "./DataFreshnessNote";
+import { SeatStatusLegend } from "./SeatStatusLegend";
 import type { UsageStats } from "../api/client";
+import { seatStatusClass } from "../utils/seatStatus";
 
 interface PlannerCondition {
   originStationId: string;
@@ -30,6 +31,10 @@ interface PurchasePlannerProps {
 
 function formatTime(time?: string): string {
   return time ? time.slice(0, 5) : "—";
+}
+
+function formatUpdatedAt(value?: string): string {
+  return value ? new Date(value).toLocaleString("zh-TW") : "—";
 }
 
 function planTitle(plan: SeatPlan): string {
@@ -78,13 +83,15 @@ function SegmentTimeline({ plan }: { plan: SeatPlan }) {
               <span>→</span>
               <strong>{segment.destinationStationName.Zh_tw ?? segment.destinationStationId}</strong>
             </div>
-            <div className="plan-segment-meta">
+          <div className="plan-segment-meta">
               <span>車次 {segment.trainNo}</span>
               <span>{formatTime(segment.departureTime)}–{formatTime(segment.arrivalTime)}</span>
               <span className={`plan-seat-mode ${segment.seatMode === "free" ? "free" : "reserved"}`}>
                 {seatModeLabel(segment.seatMode)}
               </span>
-              {segment.seatMode !== "free" && <span>{statusLabel(segment.seatStatus)}</span>}
+              {segment.seatMode !== "free" && <span className={seatStatusClass(segment.seatStatus ?? "")} title={`座位狀態：${statusLabel(segment.seatStatus)}`}>
+                {statusLabel(segment.seatStatus)}
+              </span>}
             </div>
           </div>
           {index < plan.segments.length - 1 && (
@@ -200,7 +207,6 @@ export function PurchasePlanner({ stations, stationsLoading, stationsError, onUs
 
   return (
     <section className="planner-workspace" role="tabpanel" aria-label="購票建議">
-      <DataFreshnessNote />
       <SavedConditions<PlannerCondition>
         storageKey="highspeed.saved.planner-conditions"
         label="購票建議"
@@ -299,10 +305,11 @@ export function PurchasePlanner({ stations, stationsLoading, stationsError, onUs
         </div>
         <LoadingErrorState loading={loading} error={error} />
       </div>
-      {results.length > 0 && (
+      {!loading && results.length > 0 && (
         <div className="planner-results" aria-live="polite">
           <div className="planner-results-heading"><div><p className="eyebrow">RECOMMENDATIONS</p><h2>購票建議</h2></div><span>每個日期最多 3 個方案</span></div>
-          {results.map((day) => <div className="planner-day" key={day.date}><div className="planner-day-heading"><h3>{day.date}</h3>{day.cachedAt && <span>{day.stale ? "顯示過期快取" : day.cached ? "來自本地快取" : "剛更新"} · {new Date(day.cachedAt).toLocaleString("zh-TW")}</span>}</div>{day.error ? <p className="day-error">查詢失敗：{day.error}</p> : day.plans.length === 0 ? <div className="no-plans"><strong>目前沒有可組合的方案</strong><p>可以放寬時間條件、降低轉乘限制，或改到「純查詢」查看所有車次。</p></div> : <div className="plan-list">{day.plans.map((plan) => <PlanCard key={`${day.date}-${plan.rank}-${plan.segments.map((segment) => segment.trainNo).join("-")}`} plan={plan} />)}</div>}</div>)}
+          <SeatStatusLegend />
+          {results.map((day) => <div className="planner-day" key={day.date}><div className="planner-day-heading"><h3>{day.date}</h3></div>{day.error ? <p className="day-error">查詢失敗：{day.error}</p> : day.plans.length === 0 ? <div className="no-plans"><strong>目前沒有可組合的方案</strong><p>可以放寬時間條件、降低轉乘限制，或改到「純查詢」查看所有車次。</p></div> : <div className="plan-list">{day.plans.map((plan) => <PlanCard key={`${day.date}-${plan.rank}-${plan.segments.map((segment) => segment.trainNo).join("-")}`} plan={plan} />)}</div>}{day.cachedAt && <p className={`cache-hint planner-data-freshness ${day.stale ? "cache-hint-stale" : ""}`}>{day.stale ? "TDX 暫時無法更新，顯示過期快取" : day.cached ? "來自本地快取" : "剛更新"} · 本地抓取 {formatUpdatedAt(day.cachedAt)}{day.sourceUpdatedAt && ` · 高鐵來源 ${formatUpdatedAt(day.sourceUpdatedAt)}`}{day.tdxUpdatedAt && ` · TDX ${formatUpdatedAt(day.tdxUpdatedAt)}`}</p>}</div>)}
         </div>
       )}
     </section>

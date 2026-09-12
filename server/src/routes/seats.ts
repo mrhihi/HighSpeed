@@ -53,6 +53,8 @@ export async function fetchSeatSegment(
   fromCache: boolean;
   stale: boolean;
   cachedAt: number;
+  tdxUpdatedAt?: string;
+  sourceUpdatedAt?: string;
 }> {
   const seatData = await dependencies.getOrFetchCached(
     "seats",
@@ -78,7 +80,14 @@ export async function fetchSeatSegment(
     // Seat availability remains useful when timetable enrichment fails.
   }
 
-  return { seats, fromCache: seatData.fromCache, stale: seatData.stale, cachedAt: seatData.cachedAt };
+  return {
+    seats,
+    fromCache: seatData.fromCache,
+    stale: seatData.stale,
+    cachedAt: seatData.cachedAt,
+    tdxUpdatedAt: seatData.value.UpdateTime,
+    sourceUpdatedAt: seatData.value.SrcUpdateTime,
+  };
 }
 
 router.post("/", async (req, res) => {
@@ -123,6 +132,8 @@ router.post("/", async (req, res) => {
           cached: seatData.fromCache,
           stale: seatData.stale,
           cachedAt: new Date(seatData.cachedAt).toISOString(),
+          tdxUpdatedAt: seatData.tdxUpdatedAt,
+          sourceUpdatedAt: seatData.sourceUpdatedAt,
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : "查詢失敗";

@@ -34,6 +34,8 @@ export interface DaySeatResult {
   cached?: boolean;
   stale?: boolean;
   cachedAt?: string;
+  tdxUpdatedAt?: string;
+  sourceUpdatedAt?: string;
 }
 
 export interface SeatSearchResponse {
@@ -73,6 +75,8 @@ export interface PlannerDayResult {
   cached?: boolean;
   stale?: boolean;
   cachedAt?: string;
+  tdxUpdatedAt?: string;
+  sourceUpdatedAt?: string;
 }
 
 export interface SeatPlanResponse {

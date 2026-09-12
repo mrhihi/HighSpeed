@@ -156,7 +156,14 @@ async function makePlansForDate(
   selectedSeatModes: SeatMode[],
   departureStart: string,
   departureEnd: string,
-): Promise<{ plans: SeatPlan[]; cached: boolean; stale: boolean; cachedAt: number }> {
+): Promise<{
+  plans: SeatPlan[];
+  cached: boolean;
+  stale: boolean;
+  cachedAt: number;
+  tdxUpdatedAt?: string;
+  sourceUpdatedAt?: string;
+}> {
   const daily = await fetchDailySeatData(date, forceRefresh);
   const direct = daily.getSegment(origin, destination);
   const selectedModes = new Set(selectedSeatModes);
@@ -237,7 +244,18 @@ async function makePlansForDate(
     const departure = `${date}T${plan.totalDepartureTime.slice(0, 5)}`;
     return departure >= departureStart && departure <= departureEnd;
   });
-  return { plans: sortPlans(plansInWindow), cached: daily.fromCache, stale: daily.stale, cachedAt: daily.cachedAt };
+  // 座位有限視為最後兜底：只要時段內存在一個不含 L 的方案，就不推薦含 L 的方案。
+  const plansWithoutLimitedSeats = plansInWindow.filter((plan) =>
+    plan.segments.every((segment) => segment.seatStatus !== "L"),
+  );
+  return {
+    plans: sortPlans(plansWithoutLimitedSeats.length > 0 ? plansWithoutLimitedSeats : plansInWindow),
+    cached: daily.fromCache,
+    stale: daily.stale,
+    cachedAt: daily.cachedAt,
+    tdxUpdatedAt: daily.tdxUpdatedAt,
+    sourceUpdatedAt: daily.sourceUpdatedAt,
+  };
 }
 
 router.post("/", async (req, res) => {

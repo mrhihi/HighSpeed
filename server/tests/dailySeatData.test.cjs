@@ -38,7 +38,12 @@ function fixture(t) {
       calls.push(url);
       const isSeats = url.includes('AvailableSeatStatus');
       if (isSeats ? state.failSeats : state.failTimes) throw new Error('upstream failed');
-      return structuredClone(isSeats ? { AvailableSeats: state.empty ? [] : seats } : timetable);
+      return structuredClone(isSeats ? {
+        UpdateTime: '2026-09-10T10:00:00+08:00',
+        SrcUpdateTime: '2026-09-10T09:59:00+08:00',
+        Count: state.empty ? 0 : seats.length,
+        AvailableSeats: state.empty ? [] : seats,
+      } : timetable);
     },
   };
   t.after(async () => { await Promise.all([...files].map((file) => unlink(file).catch(() => {}))); });
@@ -48,6 +53,8 @@ function fixture(t) {
 test('daily OD lookup preserves seat status, direction, stop order and independent results', async (t) => {
   const f = fixture(t);
   const daily = await fetchDailySeatData('2026-09-10', false, f.deps);
+  assert.equal(daily.tdxUpdatedAt, '2026-09-10T10:00:00+08:00');
+  assert.equal(daily.sourceUpdatedAt, '2026-09-10T09:59:00+08:00');
   assert.equal(daily.getSegment('A', 'C').seats[0].StandardSeatStatus, 'X');
   assert.equal(daily.getSegment('A', 'B').seats[0].StandardSeatStatus, 'O');
   assert.equal(daily.getSegment('B', 'C').seats[0].DepartureTime, '10:11:00');
@@ -123,6 +130,8 @@ test('pure seat lookup uses one OD seat request and one OD timetable request', a
   // The fixture returns all rows regardless of the requested OD; the route
   // relies on TDX's OD endpoint to perform that filtering upstream.
   assert.equal(result.seats.length, f.seats.length);
+  assert.equal(result.tdxUpdatedAt, '2026-09-10T10:00:00+08:00');
+  assert.equal(result.sourceUpdatedAt, '2026-09-10T09:59:00+08:00');
   assert.equal(f.calls.length, 2);
   assert.ok(f.calls[0].includes('/AvailableSeatStatus/Train/OD/A/to/C/TrainDate/2026-09-10'));
   assert.ok(f.calls[1].includes('/DailyTimetable/OD/A/to/C/2026-09-10'));
@@ -194,5 +203,14 @@ test('planner uses daily data and preserves same-train and cross-train plans', a
   assert.equal(result.error, undefined);
   assert.ok(result.plans.some((p) => p.segments.map((s) => s.trainNo).join(',') === '1,1'));
   assert.ok(result.plans.some((p) => p.segments.map((s) => s.trainNo).join(',') === '1,3'));
+  assert.ok(result.plans.every((p) => p.segments.every((s) => s.seatStatus !== 'L')));
+
+  const limitedOnly = await invoke('seatPlans', {
+    ...body,
+    selectedIntermediateStationIds: [],
+    selectedSeatModes: ['reserved-business'],
+  });
+  assert.ok(limitedOnly.plans.length > 0);
+  assert.ok(limitedOnly.plans.every((p) => p.segments.some((s) => s.seatStatus === 'L')));
   assert.equal(f.calls.length, 2);
 });
